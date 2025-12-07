@@ -1,0 +1,15 @@
+[package]
+name = "ipdf"
+version = "0.1.0"
+edition = "2024"
+
+
+[lib]
+name = "ipdf"
+
+
+[[test]]
+name = "ipdf_test"
+path = "tests"
+
+[dependencies]
