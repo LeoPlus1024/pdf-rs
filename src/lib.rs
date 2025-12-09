@@ -1,6 +1,7 @@
+pub(crate) mod bytes;
 pub mod vpdf;
 pub mod error;
 pub mod objects;
-pub mod parser;
+pub mod document;
 pub mod sequence;
-mod bytes;
+pub mod parser;

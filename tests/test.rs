@@ -1,6 +1,6 @@
+use ipdf::document::PDFDocument;
 use ipdf::error::Result;
-use ipdf::parser::parse;
-use ipdf::sequence::RandomAccessFile;
+use ipdf::sequence::{FileSequence};
 use ipdf::vpdf::PDFVersion;
 
 #[test]
@@ -20,7 +20,7 @@ fn vpdf_test() -> Result<()> {
 #[test]
 fn parse_pdf() -> Result<()> {
     let file = std::fs::File::open("document/pdfreference1.0.pdf")?;
-    let mut sequence = RandomAccessFile::new(file);
-    let t = parse(&mut sequence)?;
+    let sequence = FileSequence::new(file);
+    let t = PDFDocument::new(sequence)?;
     Ok(())
 }

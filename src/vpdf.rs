@@ -10,15 +10,22 @@ macro_rules! pdf_version {
         )+
         }
 
-        impl TryFrom<&str> for PDFVersion {
+        impl TryFrom<&str> for PDFVersion{
             type Error = Error;
             fn try_from(value: &str) -> Result<Self, Self::Error> {
-                match value {
+                match value.as_ref() {
                     $(
                         $version => Ok(PDFVersion::$name),
                     )+
                     _ => Err(error_kind::INVALID_PDF_VERSION.into()),
                 }
+            }
+        }
+
+        impl TryFrom<String> for PDFVersion{
+            type Error = Error;
+            fn try_from(value: String) -> Result<Self, Self::Error> {
+                PDFVersion::try_from(value.as_str())
             }
         }
 

@@ -138,3 +138,11 @@ register_pdf_object!(
     (IndirectObject, IndirectObject, as_indirect_object),
     (Stream, PDFStream, as_stream)
 );
+
+
+pub struct Entry {}
+pub struct Xref {
+    pub(crate) obj_num: u64,
+    pub(crate) length: u64,
+    pub(crate) entries: Vec<Entry>,
+}
