@@ -3,8 +3,14 @@ pub(crate) const LEFT_BRACKET: char = '<';
 pub(crate) const RIGHT_BRACKET: char = '>';
 pub(crate) const LEFT_PARENTHESIS: char = '(';
 pub(crate) const RIGHT_PARENTHESIS: char = ')';
+pub(crate) const DOT: char = '.';
+pub(crate) const SUB: char = '-';
+pub(crate) const ADD: char = '+';
 pub(crate) const DOUBLE_LEFT_BRACKET: &str = "<<";
 pub(crate) const DOUBLE_RIGHT_BRACKET: &str = ">>";
+
+pub(crate) const R: &str = "R";
+pub(crate) const OBJ: &str = "obj";
 
 pub(crate) const CR: char = '\r';
 pub(crate) const LF: char = '\n';
@@ -23,5 +29,5 @@ pub(crate) const END_CHARS: [char; 9] = [
     LF,
     ESCAPE,
     WHITE_SPACE,
-    SPLASH
+    SPLASH,
 ];

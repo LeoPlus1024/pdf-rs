@@ -13,3 +13,4 @@ name = "ipdf_test"
 path = "tests"
 
 [dependencies]
+log = "0.4.29"

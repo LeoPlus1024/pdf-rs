@@ -33,6 +33,7 @@ error_kind!(
     (EXCEPT_TOKEN,1012, "Except a token"),
     (STR_NOT_ENCODED,1013, "String not encoded"),
     (ILLEGAL_TOKEN,1014, "Illegal token"),
+    (INVALID_REAL_NUMBER,1015, "Invalid real number"),
 );
 
 #[derive(Debug)]
