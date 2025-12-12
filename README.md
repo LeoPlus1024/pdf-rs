@@ -7,8 +7,6 @@
 
 [English](#english) | [中文](README_zh.md)
 
-## English
-
 A PDF parsing library written in Rust.
 
 ### Overview
