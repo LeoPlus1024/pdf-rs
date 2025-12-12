@@ -5,7 +5,7 @@ pub enum PDFObject{
     Bool(PDFBool),
     Number(PDFNumber),
     Named(PDFNamed),
-    String(PDFString),
+    String(Vec<u8>),
     Array(PDFArray),
     Dict(PDFDict),
     Null,
@@ -29,12 +29,6 @@ pub enum PDFNumber {
     Signed(i64),
     Unsigned(u64),
     Real(f64),
-}
-
-
-pub enum PDFString {
-    Literal(Vec<u8>),
-    Hex(Vec<u8>),
 }
 
 pub struct PDFArray {

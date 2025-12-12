@@ -2,10 +2,11 @@ use crate::constants::pdf_key::{OBJ, R};
 use crate::constants::*;
 use crate::error::error_kind::{EOF, EXCEPT_TOKEN, ILLEGAL_TOKEN, STR_NOT_ENCODED};
 use crate::error::{Error, Result};
-use crate::objects::{Entry, EntryState, PDFArray, PDFDict, PDFDirectObject, PDFIndirectObject, PDFNamed, PDFNumber, PDFObject, PDFString, PDFXref};
+use crate::objects::{Entry, EntryState, PDFArray, PDFDict, PDFDirectObject, PDFIndirectObject, PDFNamed, PDFNumber, PDFObject, PDFXref};
 use crate::tokenizer::Token::{Delimiter, Id, Key, Number};
 use crate::tokenizer::{Token, Tokenizer};
 use std::collections::HashMap;
+use crate::bytes::hex2bytes;
 
 pub(crate) fn parse<F>(mut tokenizer: &mut Tokenizer, visit: F) -> Result<Option<PDFObject>>
 where
@@ -186,14 +187,14 @@ fn parse_string(tokenizer: &mut Tokenizer, post_script: bool) -> Result<PDFObjec
     match result {
         Ok(range) => {
             let buf = tokenizer.buf.drain(range).collect::<Vec<u8>>();
-            let pdf_str = if post_script {
-                PDFString::Hex(buf)
+            let buf = if post_script {
+                hex2bytes(&buf)
             } else {
-                PDFString::Literal(buf)
+                buf
             };
             // Remove '>' or ')'
             tokenizer.buf.remove(0);
-            Ok(PDFObject::String(pdf_str))
+            Ok(PDFObject::String(buf))
         }
         Err(_e) => Err(STR_NOT_ENCODED.into()),
     }
