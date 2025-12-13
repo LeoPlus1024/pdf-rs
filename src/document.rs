@@ -36,12 +36,12 @@ impl PDFDocument {
         let mut tokenizer = Tokenizer::new(sequence);
         tokenizer.seek(offset)?;
         let xrefs = parse_xref(&mut tokenizer)?;
-        let pdf = PDFDocument {
+        let document = PDFDocument {
             xrefs,
             version,
             tokenizer,
         };
-        Ok(pdf)
+        Ok(document)
     }
     pub fn get_xref(&self) -> &Vec<PDFXref> {
         &self.xrefs

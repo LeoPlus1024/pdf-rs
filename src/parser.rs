@@ -2,7 +2,7 @@ use crate::constants::pdf_key::{OBJ, R};
 use crate::constants::*;
 use crate::error::error_kind::{EOF, EXCEPT_TOKEN, ILLEGAL_TOKEN, STR_NOT_ENCODED};
 use crate::error::{Error, Result};
-use crate::objects::{Entry, EntryState, PDFArray, PDFDict, PDFDirectObject, PDFIndirectObject, PDFNamed, PDFNumber, PDFObject, PDFXref};
+use crate::objects::{Entry, EntryState, PDFNumber, PDFObject, PDFXref};
 use crate::tokenizer::Token::{Delimiter, Id, Key, Number};
 use crate::tokenizer::{Token, Tokenizer};
 use std::collections::HashMap;
@@ -40,7 +40,10 @@ fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
                 }
                 Err(Error::new(EXCEPT_TOKEN, "Trailer after must follow a dict".into()))
             },
-            &_ => todo!(),
+            pdf_key::NULL => Ok(PDFObject::Null),
+            pdf_key::TURE => Ok(PDFObject::Bool(true)),
+            pdf_key::FALSE => Ok(PDFObject::Bool(false)),
+            &_ => Err(Error::new(ILLEGAL_TOKEN, format!("Key '{}' not implemented", key))),
         }
         Number(number) => match number {
             PDFNumber::Unsigned(value) => {
@@ -100,19 +103,10 @@ fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject
         let object = match key.as_str() {
             OBJ => {
                 let metadata = parse_dict(tokenizer)?;
-                let object = PDFDirectObject {
-                    obj_num,
-                    gen_num,
-                    metadata: Box::new(metadata),
-                };
-                PDFObject::DirectObject(object)
+                PDFObject::ObjectRef(obj_num,gen_num,Box::new(metadata))
             },
             _ => {
-                let object = PDFIndirectObject {
-                    obj_num,
-                    gen_num,
-                };
-                PDFObject::IndirectObject(object)
+                PDFObject::IndirectObject(obj_num,gen_num)
             }
         };
         return Ok(object)
@@ -121,12 +115,12 @@ fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject
 
 }
 fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
-    let mut entries = HashMap::<PDFNamed, Option<PDFObject>>::new();
+    let mut entries = HashMap::<String, Option<PDFObject>>::new();
     loop {
         let token = tokenizer.next_token()?;
         if let Delimiter(ref delimiter) = token {
             if delimiter == DOUBLE_RIGHT_BRACKET {
-                return Ok(PDFObject::Dict(PDFDict { entries }));
+                return Ok(PDFObject::Dict(entries));
             }
         }
         let object = parser0(&mut tokenizer, token)?;
@@ -138,7 +132,7 @@ fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
                 if is_named || dict_close {
                     entries.insert(named, None);
                     if dict_close {
-                        return Ok(PDFObject::Dict(PDFDict { entries }));
+                        return Ok(PDFObject::Dict(entries));
                     }
                     continue;
                 }
@@ -154,7 +148,7 @@ fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
 fn parse_named(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
     let token = tokenizer.next_token()?;
     if let Id(name) = token {
-        return Ok(PDFObject::Named(PDFNamed { name }));
+        return Ok(PDFObject::Named(name));
     }
     Err(Error::new(
         EXCEPT_TOKEN,
@@ -168,7 +162,7 @@ fn parse_array(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
         let token = tokenizer.next_token()?;
         if let Delimiter(ref delimiter) = token {
             if delimiter == "]" {
-                return Ok(PDFObject::Array(PDFArray { elements }));
+                return Ok(PDFObject::Array(elements));
             }
         }
         let object = parser0(tokenizer, token)?;
