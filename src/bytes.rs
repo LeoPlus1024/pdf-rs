@@ -9,13 +9,7 @@ macro_rules! hex_map {
 }
 macro_rules! hex_convert {
     ($(($val:literal, $char:literal)),+$(,)?) => {
-        pub(crate) fn hex2byte(mut lsb: u8 ,mut  msb: u8)-> u8 {
-           if lsb >= b'a' {
-               lsb -= 32;
-           }
-           if msb >= b'a' {
-               msb -= 32;
-           }
+        pub(crate) fn hex2byte(lsb: u8 ,msb: u8)-> u8 {
            let lsb = char::from(lsb);
            let msb = char::from(msb);
            let lv =  hex_map!(lsb, $(($val, $char)),+);
