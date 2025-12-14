@@ -3,15 +3,15 @@
 name = "pdf-rs"
 version = "0.1.0-dev"
 edition = "2024"
-authors = ["KuiYang <kui.yang@example.com>", "杨伯均 <bojun.yang@example.com>", "LeoPlus1024 <leoplus1024@example.com>"]
+authors = ["Bojun Yang <gzyangkui@qq.com>"]
 description = "A PDF parsing library written in Rust"
-repository = "https://github.com/your-username/pdf-rs"
+repository = "https://github.com/LeoPlus1024/pdf-rs"
 license = "Apache-2.0"
 keywords = ["pdf", "parser", "rust", "parsing"]
 categories = ["parsing", "encoding", "text-processing"]
 readme = "README.md"
 documentation = "https://docs.rs/pdf-rs"
-homepage = "https://github.com/your-username/pdf-rs"
+homepage = "https://github.com/LeoPlus1024/pdf-rs"
 exclude = [
     "document/*",
     "tests/*",
