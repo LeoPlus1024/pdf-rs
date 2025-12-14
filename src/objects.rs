@@ -1,24 +1,30 @@
 use std::collections::HashMap;
+use std::iter::Map;
 
-#[derive(PartialEq,Clone)]
+#[derive(PartialEq, Clone)]
 pub enum PDFNumber {
     Signed(i64),
     Unsigned(u64),
     Real(f64),
 }
 
+#[derive(Clone)]
 pub struct XEntry {
     /// The value of the entry.
-    pub(crate) value:u64,
+    pub(crate) value: u64,
     /// The entry is either in use or deleted.
-    pub(crate) using:bool,
+    pub(crate) using: bool,
     /// The object number of the entry.
-    pub(crate) obj_num:u64,
+    pub(crate) obj_num: u64,
     /// The generation number of the entry.
     pub(crate) gen_num: u64,
 }
 
-pub enum PDFObject{
+pub struct Dictionary {
+    entries: HashMap<String, Option<PDFObject>>,
+}
+
+pub enum PDFObject {
     /// The keywords true and false represent boolean objects with values true and false.
     Bool(bool),
     /// ## Numbers
@@ -79,7 +85,7 @@ pub enum PDFObject{
     /// key is used to describe a specialization of a particular type. Its value is always a
     /// name. For a font, Type is **Font** and four Subtypes exist: Type1, MMType1,
     /// Type3, and TrueType.
-    Dict(HashMap<String, Option<PDFObject>>),
+    Dict(Dictionary),
     Null,
     /// Any object used as an element of an array or as a value in a dictionary may be
     /// specified by either a direct object or an indirect reference. An indirect reference is a
@@ -134,8 +140,164 @@ pub enum PDFObject{
     /// modified.</br>
     /// Each indirect object has a unique object number, and indirect objects are often but
     /// not necessarily numbered sequentially in the file, beginning with o
-    IndirectObject(u64, u64,Vec<PDFObject>),
+    IndirectObject(u64, u64, Vec<PDFObject>),
     Stream,
-    /// **Non-standard** pdf object only support current project parse temp storage xref  table
-    Xref(Vec<XEntry>),
+}
+
+impl PDFObject {
+    /// Returns true if the object is a boolean.
+    pub fn is_bool(&self) -> bool {
+        match self {
+            PDFObject::Bool(_) => true,
+            _ => false,
+        }
+    }
+    /// Returns the boolean value of the object if it is a boolean.
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            PDFObject::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// Returns true if the object is a number.
+    pub fn is_number(&self) -> bool {
+        match self {
+            PDFObject::Number(_) => true,
+            _ => false,
+        }
+    }
+    /// Returns the number value of the object if it is a number.
+    pub fn as_number(&self) -> Option<&PDFNumber> {
+        match self {
+            PDFObject::Number(n) => Some(n),
+            _ => None,
+        }
+    }
+    /// Returns true if the object is a string.
+    pub fn is_string(&self) -> bool {
+        match self {
+            PDFObject::String(_) => true,
+            _ => false,
+        }
+    }
+    /// Returns the string byte sequence of the object if it is a string.
+    pub fn as_str_bytes(&self) -> Option<&[u8]> {
+        match self {
+            PDFObject::String(buf) => Some(buf),
+            _ => None,
+        }
+    }
+
+    /// Returns the string value of the object if it is a string.
+    pub fn is_array(&self) -> bool {
+        match self {
+            PDFObject::Array(_) => true,
+            _ => false,
+        }
+    }
+    /// Returns the array of objects if it is an array.
+    pub fn as_array(&self) -> Option<&[PDFObject]> {
+        match self {
+            PDFObject::Array(a) => Some(a),
+            _ => None,
+        }
+    }
+    /// Returns true if the object is a dictionary.
+    pub fn is_dict(&self) -> bool {
+        match self {
+            PDFObject::Dict(_) => true,
+            _ => false,
+        }
+    }
+    /// Returns the dictionary if it is one.
+    pub fn as_dict(&self) -> Option<&Dictionary> {
+        match self {
+            PDFObject::Dict(d) => Some(d),
+            _ => None,
+        }
+    }
+    /// Returns true if the object is an indirect object.
+    pub fn is_object_ref(&self) -> bool {
+        match self {
+            PDFObject::ObjectRef(_, ..) => true,
+            _ => false,
+        }
+    }
+    /// Returns the object reference if it is one.
+    pub fn as_object_ref(&self) -> Option<(u64, u64)> {
+        match self {
+            PDFObject::ObjectRef(n, g) => Some((*n, *g)),
+            _ => None,
+        }
+    }
+
+    /// Returns true if the object is an indirect object.
+    pub fn is_indirect_object(&self) -> bool {
+        match self {
+            PDFObject::IndirectObject(_, _, _) => true,
+            _ => false,
+        }
+    }
+    /// Returns the indirect object if it is one.
+    pub fn as_indirect_object(&self) -> Option<(u64, u64, &[PDFObject])> {
+        match self {
+            PDFObject::IndirectObject(n, g, data) => Some((*n, *g, data)),
+            _ => None,
+        }
+    }
+
+    /// Returns true if the object is null.
+    pub fn is_null(&self) -> bool {
+        match self {
+            PDFObject::Null => true,
+            _ => false,
+        }
+    }
+}
+
+impl Dictionary {
+    /// Creates a new dictionary with the given entries.
+    pub(crate) fn new(entries: HashMap<String, Option<PDFObject>>) -> Self {
+        Dictionary { entries }
+    }
+    /// Returns the value of the entry with the given key.
+    pub fn get(&self, key: &str)-> Option<&PDFObject> {
+        match self.entries.get(key){
+            Some(v) => v.as_ref(),
+            None => None,
+        }
+    }
+}
+
+impl XEntry {
+    pub(crate) fn new(obj_num: u64, gen_num: u64, value: u64, using: bool) -> Self {
+        XEntry {
+            obj_num,
+            gen_num,
+            using,
+            value,
+        }
+    }
+    /// Returns the object number of the entry.
+    pub fn get_obj_num(&self)->u64{
+        self.obj_num
+    }
+    /// Returns the generation number of the entry.
+    pub fn get_gen_num(&self)->u64{
+        self.gen_num
+    }
+    /// Returns true if the entry is currently being used.
+    pub fn is_using(&self) -> bool {
+        self.using
+    }
+
+    /// Returns true if the entry is freed.
+    pub fn is_freed(&self)->bool{
+        !self.using
+    }
+    /// Returns the value of the entry.
+    pub fn get_value(&self)->u64{
+        self.value
+    }
 }

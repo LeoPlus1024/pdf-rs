@@ -2,44 +2,29 @@ use crate::constants::pdf_key::{END_OBJ, OBJ, R};
 use crate::constants::*;
 use crate::error::error_kind::{EOF, EXCEPT_TOKEN, ILLEGAL_TOKEN, STR_NOT_ENCODED};
 use crate::error::{Error, Result};
-use crate::objects::{PDFNumber, PDFObject, XEntry};
+use crate::objects::{Dictionary, PDFNumber, PDFObject, XEntry};
 use crate::tokenizer::Token::{Delimiter, Id, Key, Number};
 use crate::tokenizer::{Token, Tokenizer};
 use std::collections::HashMap;
 use crate::bytes::hex2bytes;
 
-pub(crate) fn parse<F>(mut tokenizer: &mut Tokenizer, visit: F) -> Result<Option<PDFObject>>
-where
-    F: Fn(&Token) -> bool,
+pub(crate) fn parse(mut tokenizer: &mut Tokenizer) -> Result<PDFObject>
 {
     let token = tokenizer.next_token()?;
-    if !visit(&token) {
-        return Ok(None);
-    }
     let object = parser0(&mut tokenizer, token)?;
-    Ok(Some(object))
+    Ok(object)
 }
 
 fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
     match token {
         Delimiter(delimiter) => match delimiter.as_str() {
-            DOUBLE_LEFT_BRACKET => parse_dict(tokenizer),
+            "<<" => parse_dict(tokenizer),
             "[" => parse_array(tokenizer),
             "/" => parse_named(tokenizer),
             "<" | "(" => parse_string(tokenizer, delimiter == "("),
             &_ => todo!(),
         },
         Key(key) => match key.as_str() {
-            pdf_key::XREF => parse_xref(tokenizer),
-            pdf_key::TRAILER => {
-                if let Delimiter(ref delimiter) = tokenizer.next_token()?{
-                    if *delimiter != DOUBLE_LEFT_BRACKET {
-                        return Err(Error::new(EXCEPT_TOKEN, format!("Trailer after must follow a '<<' but it was {}", delimiter)));
-                    }
-                    return parse_dict(tokenizer)
-                }
-                Err(Error::new(EXCEPT_TOKEN, "Trailer after must follow a dict".into()))
-            },
             pdf_key::NULL => Ok(PDFObject::Null),
             pdf_key::TURE => Ok(PDFObject::Bool(true)),
             pdf_key::FALSE => Ok(PDFObject::Bool(false)),
@@ -47,11 +32,11 @@ fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
         }
         Number(number) => match number {
             PDFNumber::Unsigned(value) => {
-                let is_num = tokenizer.check_next_token(|token| Ok(token.is_u64()))?;
+                let is_num = tokenizer.check_next_token(|token| token.is_u64())?;
                 if !is_num {
                     return Ok(PDFObject::Number(number));
                 }
-                let is_obj = tokenizer.check_next_token(|token| Ok(token.key_was(R) || token.key_was(OBJ)))?;
+                let is_obj = tokenizer.check_next_token(|token| token.key_was(R) || token.key_was(OBJ))?;
                 if is_obj {
                     return parse_obj(tokenizer, Some(value))
                 }
@@ -64,7 +49,7 @@ fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
     }
 }
 
-fn parse_xref(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
+pub(crate) fn parse_text_xref(tokenizer: &mut Tokenizer) -> Result<Vec<XEntry>> {
     let obj_num = tokenizer.next_token()?.as_u64()?;
     let length = tokenizer.next_token()?.as_u64()?;
     let mut entries = Vec::<XEntry>::new();
@@ -78,15 +63,15 @@ fn parse_xref(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
             _ => return Err(Error::new(EXCEPT_TOKEN, format!("Except a token with 'f' or 'n' but it is '{}'", state)))
         };
         let obj_num = obj_num + i;
-        let entry = XEntry {
-            value,
-            using,
+        let entry = XEntry::new (
             obj_num,
             gen_num,
-        };
+            value,
+            using
+        );
         entries.push(entry);
     }
-    Ok(PDFObject::Xref(entries))
+    Ok(entries)
 }
 
 fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject> {
@@ -122,11 +107,11 @@ fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject
 }
 fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
     let mut entries = HashMap::<String, Option<PDFObject>>::new();
-    loop {
+    'ext:loop {
         let token = tokenizer.next_token()?;
         if let Delimiter(ref delimiter) = token {
             if delimiter == DOUBLE_RIGHT_BRACKET {
-                return Ok(PDFObject::Dict(entries));
+                break;
             }
         }
         let object = parser0(&mut tokenizer, token)?;
@@ -138,7 +123,7 @@ fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
                 if is_named || dict_close {
                     entries.insert(named, None);
                     if dict_close {
-                        return Ok(PDFObject::Dict(entries));
+                        continue 'ext;
                     }
                     continue;
                 }
@@ -149,6 +134,7 @@ fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
             return Err(Error::new(EXCEPT_TOKEN, "Except a named token.".into()));
         }
     }
+    Ok(PDFObject::Dict(Dictionary::new(entries)))
 }
 
 fn parse_named(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
@@ -178,7 +164,7 @@ fn parse_array(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
 }
 
 fn parse_string(tokenizer: &mut Tokenizer, post_script: bool) -> Result<PDFObject> {
-    let end_chr = if post_script { ')' } else { '>' };
+    let end_chr = if post_script { RIGHT_PARENTHESIS } else { RIGHT_BRACKET };
     let mut is_escape = true;
     let result = tokenizer.loop_util(&[], |chr| {
         is_escape = (chr == ESCAPE) && !is_escape;

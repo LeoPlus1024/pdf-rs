@@ -1,14 +1,15 @@
+use crate::bytes::{count_leading_line_endings, line_ending, literal_to_u64};
 use crate::constants::pdf_key::{START_XREF, TRAILER, XREF};
-use crate::error::error_kind::INVALID_PDF_FILE;
 use crate::error::Result;
-use crate::objects::{PDFObject, XEntry};
-use crate::parser::parse;
+use crate::error::error_kind::{INVALID_PDF_FILE, NO_XREF_TABLE_FOUND};
+use crate::objects::{PDFNumber, PDFObject, XEntry};
+use crate::parser::{parse, parse_text_xref};
 use crate::sequence::{FileSequence, Sequence};
 use crate::tokenizer::Tokenizer;
 use crate::vpdf::PDFVersion;
-use std::path::PathBuf;
 use log::debug;
-use crate::bytes::{count_leading_line_endings, line_ending, literal_to_u64};
+use std::path::PathBuf;
+use crate::constants::PREV;
 
 /// Represent a PDF document
 pub struct PDFDocument {
@@ -17,13 +18,12 @@ pub struct PDFDocument {
     /// PDF version
     version: PDFVersion,
     // Tokenizer
-    tokenizer: Tokenizer
+    tokenizer: Tokenizer,
 }
 
 impl PDFDocument {
-
     /// Open a pdf document
-    pub fn open(path: PathBuf) -> Result<PDFDocument> {
+    pub  fn open(path: PathBuf) -> Result<PDFDocument> {
         let file = std::fs::File::open(path)?;
         let sequence = FileSequence::new(file);
         Self::new(sequence)
@@ -35,7 +35,9 @@ impl PDFDocument {
         let offset = cal_xref_table_offset(&mut sequence)?;
         let mut tokenizer = Tokenizer::new(sequence);
         tokenizer.seek(offset)?;
-        let xrefs = parse_xref(&mut tokenizer)?;
+        let mut xrefs = Vec::<XEntry>::new();
+        // Merge all xref table
+        merge_xref_table(&mut tokenizer,&mut xrefs)?;
         let document = PDFDocument {
             xrefs,
             version,
@@ -43,11 +45,26 @@ impl PDFDocument {
         };
         Ok(document)
     }
-    pub fn get_xref(&self) -> &Vec<XEntry> {
+    /// Get xref slice
+    pub fn get_xref_slice(&self) -> &[XEntry] {
         &self.xrefs
     }
+    /// Get PDF version
     pub fn get_version(&self) -> &PDFVersion {
         &self.version
+    }
+    /// Read object from PDFDocument
+    pub fn read_object(&mut self,index: usize) -> Result<Option<PDFObject>> {
+        if index >= self.xrefs.len() {
+            return Ok(None);
+        }
+        let entry = &self.xrefs[index];
+        if entry.is_freed() {
+            return Ok(None);
+        }
+        self.tokenizer.seek(entry.get_value())?;
+        let object = parse(&mut self.tokenizer)?;
+        Ok(Some(object))
     }
 }
 
@@ -58,11 +75,11 @@ fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
         return Err(INVALID_PDF_FILE.into());
     }
     if buf.len() < 8
-        || buf[0] != 37
-        || buf[1] != 80
-        || buf[2] != 68
-        || buf[3] != 70
-        || buf[4] != 45
+        || buf[0] != b'%'
+        || buf[1] != b'P'
+        || buf[2] != b'D'
+        || buf[3] != b'F'
+        || buf[4] != b'-'
     {
         return Err(INVALID_PDF_FILE.into());
     }
@@ -70,15 +87,38 @@ fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
     Ok(version.try_into()?)
 }
 
-fn parse_xref(mut tokenizer: &mut Tokenizer) -> Result<Vec<XEntry>> {
-    if let Some(PDFObject::Xref(entries)) = parse(&mut tokenizer, |token| token.key_was(XREF))? {
-        if let Some(PDFObject::Dict(dict)) = parse(&mut tokenizer, |token| token.key_was(TRAILER))? {
-            return Ok(entries)
+fn merge_xref_table(mut tokenizer: &mut Tokenizer,mut xrefs: &mut Vec<XEntry>) -> Result<()> {
+    let is_xref = tokenizer.check_next_token0(false, |token| token.key_was(XREF))?;
+    if !is_xref {
+        return Err(NO_XREF_TABLE_FOUND.into());
+    }
+    let entries = parse_text_xref(tokenizer)?;
+    if xrefs.is_empty() {
+        xrefs.extend_from_slice(&entries);
+    } else {
+        for entry in entries {
+            if let None = xrefs.iter().find(|it| it.obj_num == entry.obj_num) {
+                xrefs.push(entry);
+            }
         }
     }
-    Ok(vec![])
+    let is_trailer = tokenizer.check_next_token0(false, |token| token.key_was(TRAILER))?;
+    if is_trailer {
+        match parse(&mut tokenizer)?.as_dict() {
+            Some(dict) => {
+                match dict.get(PREV) {
+                    Some(PDFObject::Number(PDFNumber::Unsigned(offset)))=>{
+                        tokenizer.seek(*offset)?;
+                        merge_xref_table(tokenizer,xrefs)?;
+                    }
+                    _ => {}
+                }
+            }
+            None => {}
+        }
+    }
+    Ok(())
 }
-
 fn cal_xref_table_offset(sequence: &mut impl Sequence) -> Result<u64> {
     let size = sequence.size()?;
     let pos = if size > 1024 { size - 1024 } else { 0 };
@@ -94,13 +134,13 @@ fn cal_xref_table_offset(sequence: &mut impl Sequence) -> Result<u64> {
             tx -= 1;
             if tx == 0 {
                 index = i;
-                break
+                break;
             }
         }
     }
     // Can't find start xref
     if index == n {
-        return Err(INVALID_PDF_FILE.into())
+        return Err(INVALID_PDF_FILE.into());
     }
     index = index + chars.len();
     let crlf_num = count_leading_line_endings(&buf[index..n]);
@@ -114,7 +154,7 @@ fn cal_xref_table_offset(sequence: &mut impl Sequence) -> Result<u64> {
     }
     if end == 0 || start == end {
         debug!("Start-Xref offset not normal end");
-        return Err(INVALID_PDF_FILE.into())
+        return Err(INVALID_PDF_FILE.into());
     }
     let offset = literal_to_u64(&buf[start..end]);
     Ok(offset)

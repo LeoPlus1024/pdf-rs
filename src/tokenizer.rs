@@ -101,18 +101,24 @@ impl Tokenizer {
 
     pub(crate) fn check_next_token<F>(&mut self, func: F) -> Result<bool>
     where
-        F: Fn(&Token) -> Result<bool>,
+        F: Fn(&Token) -> bool,
+    {
+        self.check_next_token0(true, func)
+    }
+
+    pub(crate) fn check_next_token0<F>(&mut self, cache: bool, func: F) -> Result<bool>
+    where
+        F: Fn(&Token) -> bool,
     {
         let token = if let Some(chr) = self.next_chr()? {
             self.chr2token(chr)?
         } else {
             Eof
         };
-        let mut m = false;
-        if func(&token)? {
-            m = func(&token)?;
+        let m = func(&token);
+        if !m || cache {
+            self.token_buf.push(token);
         }
-        self.token_buf.push(token);
         Ok(m)
     }
 

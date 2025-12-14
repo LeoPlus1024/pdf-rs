@@ -1,7 +1,7 @@
 ## Here's my code:
 [package]
 name = "pdf-rs"
-version = "0.1.1-dev"
+version = "0.1.2-dev"
 edition = "2024"
 authors = ["Bojun Yang <gzyangkui@qq.com>"]
 description = "A PDF parsing library written in Rust"
