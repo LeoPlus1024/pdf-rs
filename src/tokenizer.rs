@@ -1,27 +1,30 @@
-use std::ops::Range;
-use log::debug;
-use crate::constants::{is_key, ADD, DOT, DOUBLE_LEFT_BRACKET, DOUBLE_RIGHT_BRACKET, END_CHARS, LEFT_BRACKET, LEFT_PARENTHESIS, LEFT_SQUARE_BRACKET, RIGHT_BRACKET, RIGHT_PARENTHESIS, RIGHT_SQUARE_BRACKET, SPLASH, SUB};
+use crate::constants::{ADD, DOT, DOUBLE_LEFT_BRACKET, DOUBLE_RIGHT_BRACKET, END_CHARS, LEFT_BRACKET, LEFT_PARENTHESIS, LEFT_SQUARE_BRACKET, RIGHT_BRACKET, RIGHT_PARENTHESIS, RIGHT_SQUARE_BRACKET, SPLASH, SUB, is_key, CR, LF};
 use crate::error::Error;
-use crate::error::error_kind::{EOF, EXCEPT_TOKEN, INVALID_NUMBER, INVALID_REAL_NUMBER, PARSE_UNSIGNED_VALUE_ERR};
+use crate::error::Result;
+use crate::error::error_kind::{
+    EOF, EXCEPT_TOKEN, INVALID_NUMBER, INVALID_REAL_NUMBER, PARSE_UNSIGNED_VALUE_ERR,
+};
 use crate::objects::PDFNumber;
 use crate::sequence::Sequence;
-use crate::error::Result;
 use crate::tokenizer::Token::{Bool, Delimiter, Eof, Id, Key, Number};
+use log::debug;
+use std::ops::Range;
+use crate::bytes::{hexdump, line_ending};
 
 pub(crate) struct Tokenizer {
-    pub(crate) buf: Vec<u8>,
-    pub(crate) token_buf: Vec<Token>,
-    pub(crate) sequence: Box<dyn Sequence>,
+    buf: Vec<u8>,
+    token_buf: Vec<Token>,
+    sequence: Box<dyn Sequence>,
 }
 
-#[derive(PartialEq,Clone)]
+#[derive(PartialEq, Clone)]
 pub(crate) enum Token {
     Id(String),
     Bool(bool),
     Key(String),
     Number(PDFNumber),
     Delimiter(String),
-    Eof
+    Eof,
 }
 
 impl Token {
@@ -40,12 +43,8 @@ impl Token {
         }
     }
 
-    pub(crate) fn is_id(&self)->bool{
-        if let Id(_) = self {
-            true
-        } else {
-            false
-        }
+    pub(crate) fn is_id(&self) -> bool {
+        if let Id(_) = self { true } else { false }
     }
 
     pub(crate) fn to_string(&self) -> String {
@@ -57,13 +56,13 @@ impl Token {
             Number(PDFNumber::Signed(num)) => num.to_string(),
             Number(PDFNumber::Real(num)) => num.to_string(),
             Bool(bool) => bool.to_string(),
-            Eof => "_eof".to_string()
+            Eof => "_eof".to_string(),
         }
     }
 
     pub(crate) fn as_u64(&self) -> Result<u64> {
         if let Number(PDFNumber::Unsigned(num)) = self {
-            return Ok(*num)
+            return Ok(*num);
         }
         Err(PARSE_UNSIGNED_VALUE_ERR.into())
     }
@@ -74,10 +73,7 @@ impl Token {
     {
         let m = func(&self);
         if !m {
-            return Err(Error::new(
-                EXCEPT_TOKEN,
-                "Token kind mistake.".into()
-            ));
+            return Err(Error::new(EXCEPT_TOKEN, "Token kind mistake.".into()));
         }
         Ok(self)
     }
@@ -85,6 +81,19 @@ impl Token {
     pub(crate) fn key_was(&self, str: &str) -> bool {
         if let Key(key) = self {
             return key == str;
+        }
+        false
+    }
+    
+    /// Returns true if the token is a delimiter.
+    pub(crate) fn is_delimiter(&self) -> bool {
+        if let Delimiter(_) = self { true } else { false }
+    }
+
+    /// Returns true if the token is a delimiter and the delimiter is the specified string.
+    pub(crate) fn delimiter_was(&self, str: &str) -> bool {
+        if let Delimiter(delimiter) = self {
+            return delimiter == str;
         }
         false
     }
@@ -101,14 +110,14 @@ impl Tokenizer {
 
     pub(crate) fn check_next_token<F>(&mut self, func: F) -> Result<bool>
     where
-        F: Fn(&Token) -> bool,
+        F: FnMut(&Token) -> bool,
     {
         self.check_next_token0(true, func)
     }
 
-    pub(crate) fn check_next_token0<F>(&mut self, cache: bool, func: F) -> Result<bool>
+    pub(crate) fn check_next_token0<F>(&mut self, cache: bool,mut func: F) -> Result<bool>
     where
-        F: Fn(&Token) -> bool,
+        F: FnMut(&Token) -> bool,
     {
         let token = if let Some(chr) = self.next_chr()? {
             self.chr2token(chr)?
@@ -129,7 +138,7 @@ impl Tokenizer {
         }
         let option = self.next_chr()?;
         if option.is_none() {
-            return Ok(Eof)
+            return Ok(Eof);
         }
         self.chr2token(option.unwrap())
     }
@@ -144,7 +153,8 @@ impl Tokenizer {
                 true => Delimiter(DOUBLE_RIGHT_BRACKET.into()),
                 false => Delimiter(RIGHT_BRACKET.into()),
             },
-            SPLASH | LEFT_PARENTHESIS | RIGHT_PARENTHESIS | LEFT_SQUARE_BRACKET | RIGHT_SQUARE_BRACKET => Delimiter(chr.into()),
+            SPLASH | LEFT_PARENTHESIS | RIGHT_PARENTHESIS | LEFT_SQUARE_BRACKET
+            | RIGHT_SQUARE_BRACKET => Delimiter(chr.into()),
             ADD | SUB | DOT => self.num_deco(chr)?,
             chr => {
                 // If the character is a digit, then we need to read the number
@@ -291,5 +301,50 @@ impl Tokenizer {
         self.token_buf.clear();
         self.buf.clear();
         Ok(n)
+    }
+
+    pub(crate) fn read_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
+        let buf_len = self.buf.len();
+        let buf = if buf_len >= len {
+            self.buf.drain(0..len).collect::<Vec<u8>>()
+        } else {
+            let diff = len - buf_len;
+            let mut bytes = vec![0u8; diff];
+            let n = self.sequence.read(&mut bytes)?;
+            let mut buf = Vec::<u8>::new();
+            buf.extend_from_slice(&self.buf);
+            buf.extend_from_slice(&bytes[0..n]);
+            // Should clear buffer
+            self.buf.clear();
+            buf
+        };
+        #[cfg(debug_assertions)]
+        {
+            hexdump(&buf);
+        }
+        // Clear token buffer
+        self.token_buf.clear();
+        Ok(buf)
+    }
+
+    pub(crate) fn drain_from_buf(&mut self, range: Range<usize>) -> Vec<u8> {
+        self.buf.drain(range).collect()
+    }
+
+    pub(crate) fn remove_buf_len(&mut self, len: usize) {
+        self.buf.drain(0..len);
+    }
+
+    /// Skip CRLF
+    ///
+    /// Return the number of bytes skipped
+    pub(crate) fn skip_crlf(&mut self) -> Result<usize> {
+        let range = self.loop_util(&[], |chr| Ok(chr != CR && chr != LF))?;
+        let mut count = 0usize;
+        if range.start < range.end {
+            count = range.end - range.start;
+            self.remove_buf_len(range.end);
+        }
+        Ok(count)
     }
 }

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::iter::Map;
 
 #[derive(PartialEq, Clone)]
 pub enum PDFNumber {
@@ -22,6 +21,10 @@ pub struct XEntry {
 
 pub struct Dictionary {
     entries: HashMap<String, Option<PDFObject>>,
+}
+
+pub struct Stream {
+    metadata: Dictionary,
 }
 
 pub enum PDFObject {
@@ -140,8 +143,23 @@ pub enum PDFObject {
     /// modified.</br>
     /// Each indirect object has a unique object number, and indirect objects are often but
     /// not necessarily numbered sequentially in the file, beginning with o
-    IndirectObject(u64, u64, Vec<PDFObject>),
-    Stream,
+    IndirectObject(u64, u64, Box<PDFObject>),
+    /// ## Streams
+    /// A stream, like a string, is a sequence of characters. However, an application can
+    /// read a small portion of a stream at a time, while a string must be read in its entirety.
+    /// For this reason, objects with potentially large amounts of data, such as images and
+    /// page descriptions, are represented as streams.
+    ///
+    /// A stream consists of a dictionary that describes a sequence of characters, followed
+    /// by the keyword stream, followed by one or more lines of characters, followed by
+    /// the keyword endstream.
+    /// ```plaintext
+    /// <stream> ::= <dictionary>
+    /// stream
+    /// {<lines of characters>}*
+    /// endstream
+    /// ```
+    Stream(Stream),
 }
 
 impl PDFObject {
@@ -240,7 +258,7 @@ impl PDFObject {
         }
     }
     /// Returns the indirect object if it is one.
-    pub fn as_indirect_object(&self) -> Option<(u64, u64, &[PDFObject])> {
+    pub fn as_indirect_object(&self) -> Option<(u64, u64, &PDFObject)> {
         match self {
             PDFObject::IndirectObject(n, g, data) => Some((*n, *g, data)),
             _ => None,
@@ -254,6 +272,22 @@ impl PDFObject {
             _ => false,
         }
     }
+    /// Returns true if the object is a stream.
+    pub fn is_stream(&self)->bool{
+        match self {
+            PDFObject::Stream(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns the stream if it is one.
+    pub fn as_stream(&self)->Option<&Stream>{
+        match self {
+            PDFObject::Stream(s) => Some(s),
+            _ => None,
+        }
+    }
+
 }
 
 impl Dictionary {
@@ -299,5 +333,12 @@ impl XEntry {
     /// Returns the value of the entry.
     pub fn get_value(&self)->u64{
         self.value
+    }
+}
+
+impl Stream {
+    /// Creates a new stream with the given metadata.
+    pub(crate) fn new(metadata: Dictionary,buf:Vec<u8>) -> Self {
+        Stream { metadata }
     }
 }

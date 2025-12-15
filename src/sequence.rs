@@ -29,7 +29,7 @@ impl FileSequence {
     fn split_line_data(&mut self, index: usize) -> Vec<u8> {
         let buf = &mut self.buf;
         let line = buf.drain(0..index).collect::<Vec<u8>>();
-        let len = buf.len();
+        buf.len();
         let crlf_num = count_leading_line_endings(buf);
         if crlf_num != 0 {
             buf.drain(0..crlf_num as usize);

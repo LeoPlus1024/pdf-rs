@@ -1,3 +1,4 @@
+use std::cmp::min;
 
 macro_rules! hex_map {
     ($hex:ident,$(($val:literal, $char:literal)),+) => {
@@ -87,6 +88,35 @@ pub(crate) fn hex2bytes(bytes: &[u8])-> Vec<u8>{
         buf.push(value);
     }
     buf
+}
+
+/// Utility function to dump a byte slice in hexadecimal and output it to stdout.
+pub(crate) fn hexdump(bytes: &[u8]) {
+    let len = bytes.len();
+    let groups = len / 16 + if len % 16 == 0 { 0 } else { 1 };
+    let mut hex = Vec::<String>::new();
+    let mut ascii = [' '; 16];
+    for group in 0..groups {
+        let offset = group * 16;
+        let bound = min(offset + 16, len);
+        for i in offset..bound {
+            hex.push(format!("{:02x}",bytes[i]));
+            let chr =  bytes[i] as char;
+            if chr.is_ascii_graphic() {
+                ascii[i - offset] = chr;
+            }else {
+                ascii[i - offset] = '.';
+            }
+        }
+        let len = hex.len();
+        if len < 16 {
+            hex.extend(vec!["  ".to_string(); 16 - len]);
+        }
+        let (left, right) = hex.split_at(8);
+        println!("{:08x}  {}  {}  |{}|", offset, left.join(" "), right.join(" "), ascii.iter().collect::<String>());
+        hex.clear();
+        ascii.fill('.');
+    }
 }
 
 #[test]

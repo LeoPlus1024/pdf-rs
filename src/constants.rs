@@ -25,7 +25,9 @@ pdf_key!(
     (TURE,"true"),
     (FALSE,"false"),
     (NULL,"null"),
-    (END_OBJ,"endobj")
+    (END_OBJ,"endobj"),
+    (STREAM,"stream"),
+    (END_STREAM,"endstream")
 );
 
 
@@ -43,6 +45,8 @@ pub(crate) const PREV: &str = "Prev";
 pub(crate) const SIZE: &str = "Size";
 pub(crate) const ROOT: &str = "Root";
 pub(crate) const CATALOG: &str = "Catalog";
+
+pub(crate) const LENGTH: &str = "Length";
 
 pub(crate) const CR: char = '\r';
 pub(crate) const LF: char = '\n';

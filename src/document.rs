@@ -49,6 +49,13 @@ impl PDFDocument {
     pub fn get_xref_slice(&self) -> &[XEntry] {
         &self.xrefs
     }
+    /// Find xref index
+    pub fn find_xref_index<F>(&self, visit: F) -> Option<usize>
+    where
+        F: Fn(&XEntry) -> bool,
+    {
+        self.xrefs.iter().position(visit)
+    }
     /// Get PDF version
     pub fn get_version(&self) -> &PDFVersion {
         &self.version

@@ -1,8 +1,8 @@
-use crate::constants::pdf_key::{END_OBJ, OBJ, R};
+use crate::constants::pdf_key::{END_OBJ, END_STREAM, OBJ, R, STREAM};
 use crate::constants::*;
-use crate::error::error_kind::{EOF, EXCEPT_TOKEN, ILLEGAL_TOKEN, STR_NOT_ENCODED};
+use crate::error::error_kind::{EOF, EXCEPT_TOKEN, ILLEGAL_STREAM, ILLEGAL_TOKEN, STR_NOT_ENCODED};
 use crate::error::{Error, Result};
-use crate::objects::{Dictionary, PDFNumber, PDFObject, XEntry};
+use crate::objects::{Dictionary, PDFNumber, PDFObject, Stream, XEntry};
 use crate::tokenizer::Token::{Delimiter, Id, Key, Number};
 use crate::tokenizer::{Token, Tokenizer};
 use std::collections::HashMap;
@@ -18,7 +18,14 @@ pub(crate) fn parse(mut tokenizer: &mut Tokenizer) -> Result<PDFObject>
 fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
     match token {
         Delimiter(delimiter) => match delimiter.as_str() {
-            "<<" => parse_dict(tokenizer),
+            "<<" =>{
+                let dict = parse_dict(tokenizer)?;
+                // If the next token is stream, then it is a stream
+                if tokenizer.check_next_token0(false,|token| token.key_was(STREAM))? {
+                    return parse_stream(tokenizer, dict);
+                }
+                Ok(PDFObject::Dict(dict))
+            }
             "[" => parse_array(tokenizer),
             "/" => parse_named(tokenizer),
             "<" | "(" => parse_string(tokenizer, delimiter == "("),
@@ -85,16 +92,11 @@ fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject
     if let Key(ref key) = type_token {
         let object = match key.as_str() {
             OBJ => {
-                let mut objects = Vec::<PDFObject>::new();
-                // Parse indirect object contain all object
-                loop {
-                    let token = tokenizer.next_token()?;
-                    if token.key_was(END_OBJ) {
-                        return Ok(PDFObject::IndirectObject(obj_num, gen_num, objects));
-                    }
-                    let object = parser0(tokenizer, token)?;
-                    objects.push(object);
-                }
+                let token = tokenizer.next_token()?;
+                let value = parser0(tokenizer, token)?;
+                // Except a token with 'endobj'
+                tokenizer.next_token()?.except(|token| token.key_was(END_OBJ))?;
+                return Ok(PDFObject::IndirectObject(obj_num, gen_num, Box::new(value)));
             },
             _ => {
                 PDFObject::ObjectRef(obj_num,gen_num)
@@ -105,9 +107,9 @@ fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject
     Err(Error::new(EXCEPT_TOKEN, "Except a token with R or obj".to_string()))
 
 }
-fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
+fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<Dictionary> {
     let mut entries = HashMap::<String, Option<PDFObject>>::new();
-    'ext:loop {
+    loop {
         let token = tokenizer.next_token()?;
         if let Delimiter(ref delimiter) = token {
             if delimiter == DOUBLE_RIGHT_BRACKET {
@@ -116,25 +118,19 @@ fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<PDFObject> {
         }
         let object = parser0(&mut tokenizer, token)?;
         if let PDFObject::Named(named) = object {
-            let token = tokenizer.next_token()?;
-            if let Delimiter(ref delimiter) = token {
-                let dict_close = *delimiter == DOUBLE_RIGHT_BRACKET;
-                let is_named = *delimiter == String::from(SPLASH);
-                if is_named || dict_close {
-                    entries.insert(named, None);
-                    if dict_close {
-                        continue 'ext;
-                    }
-                    continue;
-                }
+            let empty_or_end = tokenizer.check_next_token(|token| token.delimiter_was(DOUBLE_RIGHT_BRACKET) || token.delimiter_was("/"))?;
+            if empty_or_end {
+                entries.insert(named, None);
+                continue;
             }
+            let token = tokenizer.next_token()?;
             let value = parser0(&mut tokenizer, token)?;
             entries.insert(named, Some(value));
         } else {
             return Err(Error::new(EXCEPT_TOKEN, "Except a named token.".into()));
         }
     }
-    Ok(PDFObject::Dict(Dictionary::new(entries)))
+    Ok(Dictionary::new(entries))
 }
 
 fn parse_named(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
@@ -172,16 +168,37 @@ fn parse_string(tokenizer: &mut Tokenizer, post_script: bool) -> Result<PDFObjec
     });
     match result {
         Ok(range) => {
-            let buf = tokenizer.buf.drain(range).collect::<Vec<u8>>();
+            let buf = tokenizer.drain_from_buf(range);
             let buf = if post_script {
                 hex2bytes(&buf)
             } else {
                 buf
             };
             // Remove '>' or ')'
-            tokenizer.buf.remove(0);
+            tokenizer.remove_buf_len(1);
             Ok(PDFObject::String(buf))
         }
         Err(_e) => Err(STR_NOT_ENCODED.into()),
     }
+}
+
+/// A stream has a `/Length` entry that specifies the number of bytes of data
+/// between the `stream` and `endstream` keywords. This length does not include
+/// the `stream` or `endstream` keywords themselves, nor the required
+/// end-of-line marker (CRLF or LF) immediately following `stream`.
+pub(crate) fn parse_stream(tokenizer: &mut Tokenizer, metadata: Dictionary) -> Result<PDFObject> {
+    if let Some(PDFObject::Number(PDFNumber::Unsigned(length))) = metadata.get(LENGTH) {
+        // Skip CRLF
+        tokenizer.skip_crlf()?;
+        let length = *length as usize;
+        let buf = tokenizer.read_bytes(length)?;
+        if buf.len() != length {
+            return Err(Error::new(ILLEGAL_STREAM, format!("Require Stream length is {} but it is {}", length, buf.len()).into()));
+        }
+        let stream = Stream::new(metadata, buf);
+        // Except next token is `endstream`
+        tokenizer.next_token()?.except(|token| token.key_was(END_STREAM))?;
+        return Ok(PDFObject::Stream(stream))
+    }
+    Err(Error::new(ILLEGAL_STREAM, "Stream length is not found".into()))
 }

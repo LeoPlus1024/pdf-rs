@@ -35,7 +35,8 @@ error_kind!(
     (INVALID_REAL_NUMBER,1014, "Invalid real number"),
     (PARSE_UNSIGNED_VALUE_ERR,1015, "Parse unsigned value error"),
     (SEEK_EXEED_MAX_SIZE,1016, "Seek exceed max size"),
-    (NO_XREF_TABLE_FOUND,1017, "No xref table found")
+    (NO_XREF_TABLE_FOUND,1017, "No xref table found"),
+    (ILLEGAL_STREAM,1018, "Illegal stream"),
 );
 
 #[derive(Debug)]
