@@ -7,7 +7,7 @@ fn document() -> Result<()> {
     let xrefs = document.get_xref_slice();
     assert!(!xrefs.is_empty());
     match document.read_object(0)?{
-        Some(obj) => assert!(obj.is_stream()),
+        Some(obj) => assert!(obj.is_indirect_object()),
         _ => assert!(false),
     }
     Ok(())
