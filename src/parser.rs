@@ -108,7 +108,7 @@ fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject
 
 }
 fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<Dictionary> {
-    let mut entries = HashMap::<String, Option<PDFObject>>::new();
+    let mut entries = HashMap::<String, PDFObject>::new();
     loop {
         let token = tokenizer.next_token()?;
         if let Delimiter(ref delimiter) = token {
@@ -118,14 +118,9 @@ fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<Dictionary> {
         }
         let object = parser0(&mut tokenizer, token)?;
         if let PDFObject::Named(named) = object {
-            let empty_or_end = tokenizer.check_next_token(|token| token.delimiter_was(">>") || token.delimiter_was("/"))?;
-            if empty_or_end {
-                entries.insert(named, None);
-                continue;
-            }
             let token = tokenizer.next_token()?;
             let value = parser0(&mut tokenizer, token)?;
-            entries.insert(named, Some(value));
+            entries.insert(named, value);
         } else {
             return Err(Error::new(EXCEPT_TOKEN, "Except a named token.".into()));
         }

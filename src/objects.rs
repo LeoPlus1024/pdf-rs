@@ -20,7 +20,7 @@ pub struct XEntry {
 }
 
 pub struct Dictionary {
-    entries: HashMap<String, Option<PDFObject>>,
+    entries: HashMap<String, PDFObject>,
 }
 
 pub struct Stream {
@@ -292,15 +292,12 @@ impl PDFObject {
 
 impl Dictionary {
     /// Creates a new dictionary with the given entries.
-    pub(crate) fn new(entries: HashMap<String, Option<PDFObject>>) -> Self {
+    pub(crate) fn new(entries: HashMap<String, PDFObject>) -> Self {
         Dictionary { entries }
     }
     /// Returns the value of the entry with the given key.
     pub fn get(&self, key: &str)-> Option<&PDFObject> {
-        match self.entries.get(key){
-            Some(v) => v.as_ref(),
-            None => None,
-        }
+        self.entries.get(key)
     }
 }
 
