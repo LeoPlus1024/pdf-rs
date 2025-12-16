@@ -287,6 +287,20 @@ impl PDFObject {
             _ => None,
         }
     }
+    /// Returns true if the object is a name.
+    pub fn is_name(&self)->bool{
+        match self {
+            PDFObject::Named(_) => true,
+            _ => false,
+        }
+    }
+    /// Returns the name if it is one.
+    pub fn as_name(&self)->Option<&String>{
+        match self {
+            PDFObject::Named(s) => Some(s),
+            _ => None,
+        }
+    }
 
 }
 
@@ -307,6 +321,33 @@ impl Dictionary {
     /// Returns true if the dictionary contains the given key.
     pub fn contain(&self, key: &str)->bool{
         self.entries.contains_key(key)
+    }
+
+    /// Returns the value of the entry with the given key as a name.
+    pub fn get_named_value(&self, key: &str) -> Option<&String> {
+        self.get(key).and_then(|it| it.as_name())
+    }
+
+
+    /// Returns the value of the entry with the given key as a u64.
+    pub fn get_u64_num(&self, key: &str) -> Option<u64> {
+        self.get(key)
+            .and_then(|it| it.as_number())
+            .and_then(|it| if let PDFNumber::Unsigned(num) = it { Some(*num) } else { None })
+    }
+
+    /// Returns true if the value of the entry with the given key is the given name.
+    pub fn named_value_was(&self, keys: &str,except:&str) -> bool {
+        if let Some(value) = self.get_named_value(keys) {
+            value == except
+        } else {
+            false
+        }
+    }
+
+    /// Returns the value of the entry with the given key as an array.
+    pub fn get_array_value(&self, key: &str) -> Option<&[PDFObject]> {
+        self.get(key).and_then(|it| it.as_array())
     }
 }
 

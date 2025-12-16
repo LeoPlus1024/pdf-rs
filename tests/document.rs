@@ -6,6 +6,7 @@ fn document() -> Result<()> {
     let mut document = PDFDocument::open(PathBuf::from("document/pdfreference1.0.pdf"))?;
     let xrefs = document.get_xref_slice();
     assert!(!xrefs.is_empty());
+    assert_eq!(document.get_page_num(), 230);
     match document.read_object(0)?{
         Some(obj) => assert!(obj.is_indirect_object()),
         _ => assert!(false),

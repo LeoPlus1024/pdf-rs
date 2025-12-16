@@ -4,15 +4,15 @@ use crate::constants::{PREV, ROOT};
 use crate::error::error_kind::{
     CANT_FIND_ROOT, EXCEPT_TRAILER, INVALID_PDF_FILE, NO_XREF_TABLE_FOUND,
 };
-use crate::error::{Error, Result};
-use crate::objects::{Dictionary, PDFNumber, PDFObject, XEntry};
-use crate::page::PageTree;
+use crate::error::{Result};
+use crate::objects::{PDFNumber, PDFObject, XEntry};
 use crate::parser::{parse, parse_text_xref};
 use crate::sequence::{FileSequence, Sequence};
 use crate::tokenizer::Tokenizer;
 use crate::vpdf::PDFVersion;
 use log::debug;
 use std::path::PathBuf;
+use crate::page::{create_page_tree_arena, PageTreeArean};
 
 /// Represent a PDF document
 pub struct PDFDocument {
@@ -22,8 +22,8 @@ pub struct PDFDocument {
     version: PDFVersion,
     /// Tokenizer
     tokenizer: Tokenizer,
-    /// Root
-    root: (u64, u64),
+    // Page Tree Arena
+    page_tree_arena: PageTreeArean
 }
 
 impl PDFDocument {
@@ -41,14 +41,14 @@ impl PDFDocument {
         let mut tokenizer = Tokenizer::new(sequence);
         tokenizer.seek(offset)?;
         // Merge all xref table
-        let (xrefs, root) = merge_xref_table(&mut tokenizer)?;
-        let mut document = PDFDocument {
+        let (xrefs, catalog) = merge_xref_table(&mut tokenizer)?;
+        let page_tree_arena = create_page_tree_arena(&mut tokenizer,catalog,&xrefs)?;
+        let document = PDFDocument {
             xrefs,
             version,
             tokenizer,
-            root,
+            page_tree_arena
         };
-        document.create_page_tree();
         Ok(document)
     }
     /// Get xref slice
@@ -80,9 +80,9 @@ impl PDFDocument {
         Ok(Some(object))
     }
 
-    /// Create page tree
-    fn create_page_tree(&mut self) {
-
+    /// Get pdf page number
+    pub fn get_page_num(&self) -> usize {
+        self.page_tree_arena.get_page_num()
     }
 }
 

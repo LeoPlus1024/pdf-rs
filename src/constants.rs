@@ -30,9 +30,13 @@ pdf_key!(
     (END_STREAM,"endstream")
 );
 
+pub(crate) const KIDS: &str = "Kids";
+pub(crate) const TYPE: &str = "Type";
 pub(crate) const PREV: &str = "Prev";
 pub(crate) const SIZE: &str = "Size";
 pub(crate) const ROOT: &str = "Root";
+pub(crate) const COUNT: &str = "Count";
+pub(crate) const PAGES: &str = "Pages";
 pub(crate) const CATALOG: &str = "Catalog";
 
 pub(crate) const LENGTH: &str = "Length";

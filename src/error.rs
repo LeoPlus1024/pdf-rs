@@ -39,6 +39,7 @@ error_kind!(
     (ILLEGAL_STREAM,1018, "Illegal stream"),
     (EXCEPT_TRAILER,1019, "Except trailer"),
     (CANT_FIND_ROOT,1020, "Can't find root"),
+    (PAGE_NOT_FOUND,1021, "Page not found"),
 );
 
 #[derive(Debug)]

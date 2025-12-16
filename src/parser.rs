@@ -8,6 +8,11 @@ use crate::tokenizer::{Token, Tokenizer};
 use std::collections::HashMap;
 use crate::bytes::hex2bytes;
 
+pub(crate) fn parse_with_offset(tokenizer: &mut Tokenizer,offset:u64) -> Result<PDFObject>{
+    tokenizer.seek(offset)?;
+    parse(tokenizer)
+}
+
 pub(crate) fn parse(mut tokenizer: &mut Tokenizer) -> Result<PDFObject>
 {
     let token = tokenizer.next_token()?;
