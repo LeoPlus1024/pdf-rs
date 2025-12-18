@@ -1,11 +1,11 @@
 use crate::constants::pdf_key::{END_OBJ, END_STREAM, OBJ, R, STREAM};
 use crate::constants::*;
-use crate::error::error_kind::{EOF, EXCEPT_TOKEN, ILLEGAL_STREAM, ILLEGAL_TOKEN, STR_NOT_ENCODED};
-use crate::error::{Error, Result};
+use crate::error::{PDFError, Result};
 use crate::objects::{Dictionary, PDFNumber, PDFObject, Stream, XEntry};
 use crate::tokenizer::Token::{Delimiter, Id, Key, Number};
 use crate::tokenizer::{Token, Tokenizer};
 use std::collections::HashMap;
+use crate::error::PDFError::{EOFError, PDFParseError, PDFParseError0};
 use crate::utils::hex2bytes;
 
 pub(crate) fn parse_with_offset(tokenizer: &mut Tokenizer,offset:u64) -> Result<PDFObject>{
@@ -44,7 +44,7 @@ fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
                 let token = tokenizer.next_token()?;
                 parser0(tokenizer, token)
             },
-            &_ => Err(Error::new(ILLEGAL_TOKEN, format!("Key '{}' not implemented", key))),
+            &_ => Err(PDFParseError0(format!("Key '{}' not implemented", key))),
         }
         Number(number) => match number {
             PDFNumber::Unsigned(value) => {
@@ -60,8 +60,8 @@ fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
             }
             _ => Ok(PDFObject::Number(number))
         },
-        Token::Eof => Err(EOF.into()),
-        _ => Err(Error::new(ILLEGAL_TOKEN, format!("Illegal token:{}", token.to_string())))
+        Token::Eof => Err(EOFError),
+        _ => Err(PDFParseError0(format!("Illegal token:{}", token.to_string())))
     }
 }
 
@@ -76,7 +76,7 @@ pub(crate) fn parse_text_xref(tokenizer: &mut Tokenizer) -> Result<Vec<XEntry>> 
         let using = match state.as_str() {
             "n" => true,
             "f" => false,
-            _ => return Err(Error::new(EXCEPT_TOKEN, format!("Except a token with 'f' or 'n' but it is '{}'", state)))
+            _ => return Err(PDFParseError0(format!("Except a token with 'f' or 'n' but it is '{}'", state)))
         };
         let obj_num = obj_num + i;
         let entry = XEntry::new (
@@ -113,7 +113,7 @@ fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject
         };
         return Ok(object)
     }
-    Err(Error::new(EXCEPT_TOKEN, "Except a token with R or obj".to_string()))
+    Err(PDFParseError("Except a token with R or obj"))
 
 }
 fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<Dictionary> {
@@ -131,7 +131,7 @@ fn parse_dict(mut tokenizer: &mut Tokenizer) -> Result<Dictionary> {
             let value = parser0(&mut tokenizer, token)?;
             entries.insert(named, value);
         } else {
-            return Err(Error::new(EXCEPT_TOKEN, "Except a named token."));
+            return Err(PDFError::PDFParseError("Except a named token."));
         }
     }
     Ok(Dictionary::new(entries))
@@ -142,10 +142,7 @@ fn parse_named(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
     if let Id(name) = token {
         return Ok(PDFObject::Named(name));
     }
-    Err(Error::new(
-        EXCEPT_TOKEN,
-        "Except a identifier token.".to_string(),
-    ))
+    Err(PDFParseError("Except a identifier token."))
 }
 
 fn parse_array(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
@@ -182,7 +179,7 @@ fn parse_string(tokenizer: &mut Tokenizer, post_script: bool) -> Result<PDFObjec
             tokenizer.remove_buf_len(1);
             Ok(PDFObject::String(buf))
         }
-        Err(_e) => Err(STR_NOT_ENCODED.into()),
+        Err(_e) => Err(PDFParseError("String did not close properly")),
     }
 }
 
@@ -197,12 +194,12 @@ pub(crate) fn parse_stream(tokenizer: &mut Tokenizer, metadata: Dictionary) -> R
         let length = *length as usize;
         let buf = tokenizer.read_bytes(length)?;
         if buf.len() != length {
-            return Err(Error::new(ILLEGAL_STREAM, format!("Require Stream length is {} but it is {}", length, buf.len())));
+            return Err(PDFParseError0(format!("Require Stream length is {} but it is {}", length, buf.len())));
         }
         let stream = Stream::new(metadata, buf);
         // Except next token is `endstream`
         tokenizer.next_token()?.except(|token| token.key_was(END_STREAM))?;
         return Ok(PDFObject::Stream(stream))
     }
-    Err(Error::new(ILLEGAL_STREAM, "Stream length is not found"))
+    Err(PDFParseError("Stream length is not found"))
 }

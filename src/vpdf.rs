@@ -1,5 +1,6 @@
 use std::fmt::Display;
-use crate::error::{Error, error_kind};
+use std::str::FromStr;
+use crate::error::PDFError;
 
 macro_rules! pdf_version {
     ($(($name:ident,$version:literal)),+$(,)?) => {
@@ -10,26 +11,26 @@ macro_rules! pdf_version {
         )+
         }
 
-        impl TryFrom<&str> for PDFVersion{
-            type Error = Error;
-            fn try_from(value: &str) -> Result<Self, Self::Error> {
-                match value.as_ref() {
+        impl FromStr for PDFVersion {
+            type Err = PDFError;
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                match value {
                     $(
                         $version => Ok(PDFVersion::$name),
                     )+
-                    _ => Err(error_kind::INVALID_PDF_VERSION.into()),
+                    _ => Err(PDFError::NotSupportPDFVersion(value.to_string())),
                 }
             }
         }
 
         impl TryFrom<String> for PDFVersion{
-            type Error = Error;
+            type Error = PDFError;
             fn try_from(value: String) -> Result<Self, Self::Error> {
-                PDFVersion::try_from(value.as_str())
+                Self::from_str(&value)
             }
         }
 
-        impl Display for PDFVersion{
+        impl Display for PDFVersion {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self{
                     $(

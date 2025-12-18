@@ -1,15 +1,12 @@
-use crate::constants::{is_key};
-use crate::error::Error;
+use crate::constants::is_key;
+use crate::error::PDFError;
+use crate::error::PDFError::{PDFParseError0};
 use crate::error::Result;
-use crate::error::error_kind::{
-    EOF, EXCEPT_TOKEN, INVALID_NUMBER, INVALID_REAL_NUMBER, PARSE_UNSIGNED_VALUE_ERR,
-};
 use crate::objects::PDFNumber;
 use crate::sequence::Sequence;
 use crate::tokenizer::Token::{Bool, Delimiter, Eof, Id, Key, Number};
-use log::debug;
-use std::ops::Range;
 use crate::utils::{hexdump, line_ending};
+use std::ops::Range;
 
 /// Common end characters
 const COMMON_END_CHARS: [char; 11] = [
@@ -79,7 +76,7 @@ impl Token {
         if let Number(PDFNumber::Unsigned(num)) = self {
             return Ok(*num);
         }
-        Err(PARSE_UNSIGNED_VALUE_ERR.into())
+        Err(PDFParseError0(format!("Token can't convert to u64:'{}'",self.to_string())))
     }
 
     pub(crate) fn except<F>(self, func: F) -> Result<Self>
@@ -88,7 +85,7 @@ impl Token {
     {
         let m = func(&self);
         if !m {
-            return Err(Error::new(EXCEPT_TOKEN, "Token kind mistake."));
+            return Err(PDFError::PDFParseError("Token kind mistake."));
         }
         Ok(self)
     }
@@ -198,14 +195,13 @@ impl Tokenizer {
             // If the character is a dot, then we need to check if it is a valid real number
             if is_dot {
                 if is_real {
-                    debug!("invalid real number:multiple dots was found.");
-                    return Err(INVALID_REAL_NUMBER.into());
+                    return Err(PDFError::PDFParseError("Multiple dot was found in real number."));
                 }
                 is_real = true;
             } else {
                 let is_digit = c.is_digit(10);
                 if !is_digit {
-                    return Err(INVALID_NUMBER.into());
+                    return Err(PDFError::PDFParseError0(format!("Invalid number character: {:0x}", c as u8)));
                 }
             }
             return Ok(false);
@@ -238,7 +234,7 @@ impl Tokenizer {
                 let mut bytes = [0u8; 1024];
                 let n = self.sequence.read(&mut bytes)?;
                 if n == 0 {
-                    return Err(EOF.into());
+                    return Err(PDFError::EOFError);
                 }
                 buf.extend_from_slice(&bytes[0..n]);
             }

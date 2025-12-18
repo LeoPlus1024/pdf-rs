@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use crate::utils::xrefs_search;
-use crate::constants::{COUNT, KIDS, OUTLINES, PAGES, TYPE};
-use crate::error::error_kind::{PAGE_PARSE_ERROR};
-use crate::error::{Error, Result};
+use crate::constants::{COUNT, KIDS, PAGES, TYPE};
+use crate::error::PDFError::{ObjectAttrMiss, PDFParseError, XrefEntryNotFound};
+use crate::error::Result;
 use crate::objects::{Dictionary, PDFObject, XEntry};
 use crate::parser::parse_with_offset;
 use crate::tokenizer::Tokenizer;
+use crate::utils::xrefs_search;
+use std::collections::HashMap;
 
 type NodeId = u64;
 
@@ -50,7 +50,7 @@ pub(crate) fn create_page_tree_arena(tokenizer: &mut Tokenizer, catalog: (u64, u
     let obj = parse_with_offset(tokenizer, entry.value)?;
     let catalog_attr = match obj {
         PDFObject::IndirectObject(_, _, value) => value.to_dict(),
-        _ => return Err(Error::new(PAGE_PARSE_ERROR, format!("Can not find page catalog with {} {}", catalog.0, catalog.1)))
+        _ => return Err(ObjectAttrMiss("PDF catalog not found."))
     };
     match catalog_attr {
         Some(dict) => {
@@ -62,10 +62,10 @@ pub(crate) fn create_page_tree_arena(tokenizer: &mut Tokenizer, catalog: (u64, u
             }
             match page_tree_arean {
                 Some(value) => Ok(value),
-                None => Err(Error::new(PAGE_PARSE_ERROR, "Catalog attribute not contain pages attr."))
+                None => Err(ObjectAttrMiss("Catalog attribute not contain pages attr."))
             }
         }
-        _ => Err(Error::new(PAGE_PARSE_ERROR, "Catalog attribute not found or not a dict."))
+        _ => Err(ObjectAttrMiss("Catalog attribute not found or not a dict."))
     }
 
 }
@@ -91,11 +91,11 @@ fn build_page_tree(tokenizer: &mut Tokenizer, xrefs: &[XEntry], obj_ref: (u64, u
     let entry = xrefs_search(xrefs, obj_ref)?;
     let obj = match parse_with_offset(tokenizer, entry.value)? {
         PDFObject::IndirectObject(_, _, value) => *value,
-        _ => return Err(Error::new(PAGE_PARSE_ERROR, format!("Can not find page catalog with {} {}", obj_ref.0, obj_ref.1)))
+        _ => return Err(XrefEntryNotFound(obj_ref.0, obj_ref.1))
     };
     let dict = match obj {
         PDFObject::Dict(dict) => dict,
-        _ => return Err(Error::new(PAGE_PARSE_ERROR, "Page attributes is not a dict"))
+        _ => return Err(PDFParseError("Page attributes is not a dict"))
     };
     let is_page_tree = dict.named_value_was(TYPE, PAGES);
     // If it is not a page tree, then it is a page
@@ -111,13 +111,13 @@ fn build_page_tree(tokenizer: &mut Tokenizer, xrefs: &[XEntry], obj_ref: (u64, u
     }
     let count = match dict.get_u64_num(COUNT) {
         Some(count) => count as usize,
-        _ => return Err(Error::new(PAGE_PARSE_ERROR, "Page count not exist or not a number"))
+        _ => return Err(PDFParseError("Page count not exist or not a number"))
     };
     let mut kids = None;
     if count > 0 {
         let arr = match dict.get_array_value(KIDS) {
             Some(kids) => kids,
-            _ => return Err(Error::new(PAGE_PARSE_ERROR, "Page kids not exist or not an array"))
+            _ => return Err(PDFParseError("Page kids not exist or not an array"))
         };
         let mut children: Vec<NodeId> = Vec::with_capacity(arr.len());
         let tmp = Some(obj_ref.0);
@@ -126,7 +126,7 @@ fn build_page_tree(tokenizer: &mut Tokenizer, xrefs: &[XEntry], obj_ref: (u64, u
                 children.push(*obj_num);
                 build_page_tree(tokenizer, xrefs, (*obj_num, *gen_num), tmp, nodes)?;
             } else {
-                return Err(Error::new(PAGE_PARSE_ERROR, "Page kids not exist or not an object reference"));
+                return Err(PDFParseError("Page kids not exist or not an object reference"));
             }
         }
         kids = Some(children)

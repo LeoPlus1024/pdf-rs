@@ -1,7 +1,6 @@
 use std::cmp::min;
-use crate::error::Error;
+use crate::error::PDFError::XrefEntryNotFound;
 use crate::error::Result;
-use crate::error::error_kind::PAGE_PARSE_ERROR;
 use crate::objects::XEntry;
 
 /// Maps a hexadecimal character to its corresponding numeric value.
@@ -225,7 +224,7 @@ pub(crate) fn hexdump(bytes: &[u8]) {
 pub(crate) fn xrefs_search(xrefs: &[XEntry], obj_ref: (u64, u64)) -> Result<&XEntry> {
     xrefs.iter()
         .find(|x| x.obj_num == obj_ref.0 && x.gen_num == obj_ref.1)
-        .ok_or_else(|| Error::new(PAGE_PARSE_ERROR, format!("Can not find page catalog with:({},{})", obj_ref.0, obj_ref.1)))
+        .ok_or_else(|| XrefEntryNotFound(obj_ref.0, obj_ref.1))
 }
 
 #[test]

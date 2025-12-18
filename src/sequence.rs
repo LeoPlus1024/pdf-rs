@@ -1,7 +1,6 @@
 use std::cmp::min;
 use crate::utils::{count_leading_line_endings, line_ending};
-use crate::error::Result;
-use crate::error::error_kind::{EOF, SEEK_EXEED_MAX_SIZE};
+use crate::error::{PDFError, Result};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 
@@ -66,7 +65,7 @@ impl Sequence for FileSequence {
             tmp = len;
             let n = self.file.read(&mut bytes)?;
             if n == 0 {
-                return Err(EOF.into());
+                return Err(PDFError::EOFError);
             }
             let offset = if len == 0 {
                 count_leading_line_endings(&bytes)
@@ -86,7 +85,7 @@ impl Sequence for FileSequence {
 
     fn seek(&mut self, pos: u64) -> Result<u64> {
         if self.size()? < pos {
-            return Err(SEEK_EXEED_MAX_SIZE.into());
+            return Err(PDFError::SeekExceedError);
         }
         let n = self.file.seek(SeekFrom::Start(pos))?;
         // Due to seek, the buffer is no longer valid
