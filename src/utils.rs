@@ -174,6 +174,13 @@ pub(crate) fn hex2bytes(bytes: &[u8])-> Vec<u8>{
 }
 
 /// Utility function to dump a byte slice in hexadecimal and output it to stdout.
+///
+/// This function formats a byte slice as a hexadecimal dump similar to tools like xxd or hexdump,
+/// showing both hexadecimal representation and ASCII representation of the bytes.
+///
+/// # Arguments
+///
+/// * `bytes` - A slice of bytes to dump in hexadecimal format
 pub(crate) fn hexdump(bytes: &[u8]) {
     let len = bytes.len();
     let groups = len / 16 + if len % 16 == 0 { 0 } else { 1 };
@@ -220,19 +227,28 @@ pub(crate) fn hexdump(bytes: &[u8]) {
 ///
 /// # Errors
 ///
-/// Returns an error with kind PAGE_PARSE_ERROR if no XRef entry matches the given object reference.
-pub(crate) fn xrefs_search(xrefs: &[XEntry], obj_ref: (u64, u64)) -> Result<&XEntry> {
+/// Returns an XrefEntryNotFound error if no XRef entry matches the given object reference.
+pub(crate) fn xrefs_search(xrefs: &[XEntry], obj_ref: (u32, u16)) -> Result<&XEntry> {
     xrefs.iter()
         .find(|x| x.obj_num == obj_ref.0 && x.gen_num == obj_ref.1)
         .ok_or_else(|| XrefEntryNotFound(obj_ref.0, obj_ref.1))
 }
 
-#[test]
-fn test_hex2bytes(){
-    let hex = "012F3D4C".as_bytes();
-    let buf = hex2bytes(hex);
-    assert_eq!(buf, [0x01, 0x2F, 0x3D, 0x4c]);
-    let hex = "012F3D4".as_bytes();
-    // Test if the last byte is not a hex digit
-    assert_eq!(hex2bytes(hex), [0x01, 0x2F, 0x3D, 0x40])
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests the hex2bytes function with various inputs.
+    ///
+    /// Verifies that hexadecimal strings are correctly converted to byte arrays,
+    /// including handling of odd-length strings.
+    #[test]
+    fn test_hex2bytes(){
+        let hex = "012F3D4C".as_bytes();
+        let buf = hex2bytes(hex);
+        assert_eq!(buf, [0x01, 0x2F, 0x3D, 0x4c]);
+        let hex = "012F3D4".as_bytes();
+        // Test if the last byte is not a hex digit
+        assert_eq!(hex2bytes(hex), [0x01, 0x2F, 0x3D, 0x40])
+    }
 }

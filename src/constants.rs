@@ -70,3 +70,8 @@ pub(crate) const CATALOG: &str = "Catalog";
 pub(crate) const OUTLINES: &str = "Outlines";
 /// Key for stream length.
 pub(crate) const LENGTH: &str = "Length";
+
+pub(crate) const FIRST: &str = "First";
+pub(crate) const LAST: &str = "Last";
+
+pub(crate) const NEXT: &str = "Next";

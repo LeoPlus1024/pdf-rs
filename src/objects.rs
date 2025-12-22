@@ -14,9 +14,9 @@ pub struct XEntry {
     /// The entry is either in use or deleted.
     pub(crate) using: bool,
     /// The object number of the entry.
-    pub(crate) obj_num: u64,
+    pub(crate) obj_num: u32,
     /// The generation number of the entry.
-    pub(crate) gen_num: u64,
+    pub(crate) gen_num: u16,
 }
 
 pub struct Dictionary {
@@ -117,7 +117,7 @@ pub enum PDFObject {
     /// 64
     /// endobj
     /// ```
-    ObjectRef(u64, u64),
+    ObjectRef(u32, u16),
     /// A direct object is a boolean, number, string, name, array, dictionary, stream, or null,
     /// as described in the previous sections. An indirect object is an object that has been
     /// labeled so that it can be referenced by other objects. Any type of object may be an
@@ -143,7 +143,7 @@ pub enum PDFObject {
     /// modified.</br>
     /// Each indirect object has a unique object number, and indirect objects are often but
     /// not necessarily numbered sequentially in the file, beginning with o
-    IndirectObject(u64, u64, Box<PDFObject>),
+    IndirectObject(u32, u16, Box<PDFObject>),
     /// ## Streams
     /// A stream, like a string, is a sequence of characters. However, an application can
     /// read a small portion of a stream at a time, while a string must be read in its entirety.
@@ -250,7 +250,7 @@ impl PDFObject {
         }
     }
     /// Returns the object reference if it is one.
-    pub fn as_object_ref(&self) -> Option<(u64, u64)> {
+    pub fn as_object_ref(&self) -> Option<(u32, u16)> {
         match self {
             PDFObject::ObjectRef(n, g) => Some((*n, *g)),
             _ => None,
@@ -265,7 +265,7 @@ impl PDFObject {
         }
     }
     /// Returns the indirect object if it is one.
-    pub fn as_indirect_object(&self) -> Option<(u64, u64, &PDFObject)> {
+    pub fn as_indirect_object(&self) -> Option<(u32, u16, &PDFObject)> {
         match self {
             PDFObject::IndirectObject(n, g, data) => Some((*n, *g, data)),
             _ => None,
@@ -359,7 +359,7 @@ impl Dictionary {
 }
 
 impl XEntry {
-    pub(crate) fn new(obj_num: u64, gen_num: u64, value: u64, using: bool) -> Self {
+    pub(crate) fn new(obj_num: u32, gen_num: u16, value: u64, using: bool) -> Self {
         XEntry {
             obj_num,
             gen_num,
@@ -368,11 +368,11 @@ impl XEntry {
         }
     }
     /// Returns the object number of the entry.
-    pub fn get_obj_num(&self)->u64{
+    pub fn get_obj_num(&self)->u32{
         self.obj_num
     }
     /// Returns the generation number of the entry.
-    pub fn get_gen_num(&self)->u64{
+    pub fn get_gen_num(&self)->u16{
         self.gen_num
     }
     /// Returns true if the entry is currently being used.

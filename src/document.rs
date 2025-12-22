@@ -1,4 +1,4 @@
-use crate::catalog::{create_page_tree_arena, PageTreeArean};
+use crate::catalog::{decode_catalog_data, PageTreeArean};
 use crate::constants::pdf_key::{START_XREF, XREF};
 use crate::constants::{PREV, ROOT};
 use crate::error::PDFError::{InvalidPDFDocument, PDFParseError, XrefTableNotFound};
@@ -11,27 +11,52 @@ use crate::utils::{count_leading_line_endings, line_ending, literal_to_u64};
 use std::path::PathBuf;
 use crate::vpdf::PDFVersion;
 
-/// Represent a PDF document
+/// Represents a PDF document with all its components and functionality.
+///
+/// This struct encapsulates a parsed PDF document, providing access to its cross-reference
+/// table, version information, tokenizer, and page structure.
 pub struct PDFDocument {
-    /// Cross-reference table
+    /// Cross-reference table containing references to all objects in the PDF.
     xrefs: Vec<XEntry>,
-    /// PDF version
+    /// PDF version information.
     version: PDFVersion,
-    /// Tokenizer
+    /// Tokenizer for parsing the PDF content.
     tokenizer: Tokenizer,
-    // Page Tree Arena
+    /// Page tree arena containing the hierarchical page structure.
     page_tree_arena: PageTreeArean
 }
 
 impl PDFDocument {
-    /// Open a pdf document
+    /// Opens a PDF document from a file path.
+    ///
+    /// This function opens a PDF file, reads its content, and parses it into a PDFDocument.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the PDF file to open
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the parsed `PDFDocument` or an error if the file cannot be opened
+    /// or parsed correctly
     pub fn open(path: PathBuf) -> Result<PDFDocument> {
         let file = std::fs::File::open(path)?;
         let sequence = FileSequence::new(file);
         Self::new(sequence)
     }
 
-    /// Create a pdf document from sequence
+    /// Creates a PDF document from a sequence of bytes.
+    ///
+    /// This function parses a sequence of bytes representing a PDF document and constructs
+    /// a PDFDocument instance with all its components.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - A sequence implementation providing access to the PDF bytes
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the parsed `PDFDocument` or an error if parsing fails
     pub fn new(mut sequence: impl Sequence + 'static) -> Result<PDFDocument> {
         let version = parse_version(&mut sequence)?;
         let offset = cal_xref_table_offset(&mut sequence)?;
@@ -39,7 +64,7 @@ impl PDFDocument {
         tokenizer.seek(offset)?;
         // Merge all xref table
         let (xrefs, catalog) = merge_xref_table(&mut tokenizer)?;
-        let page_tree_arena = create_page_tree_arena(&mut tokenizer,catalog,&xrefs)?;
+        let (page_tree_arena, _) = decode_catalog_data(&mut tokenizer,catalog,&xrefs)?;
         let document = PDFDocument {
             xrefs,
             version,
@@ -48,22 +73,51 @@ impl PDFDocument {
         };
         Ok(document)
     }
-    /// Get xref slice
+
+    /// Gets a reference to the cross-reference table slice.
+    ///
+    /// # Returns
+    ///
+    /// A slice reference to the vector of cross-reference entries
     pub fn get_xref_slice(&self) -> &[XEntry] {
         &self.xrefs
     }
-    /// Find xref index
+
+    /// Finds the index of a cross-reference entry that matches a condition.
+    ///
+    /// # Arguments
+    ///
+    /// * `visit` - A closure that takes a reference to an XEntry and returns a boolean
+    ///
+    /// # Returns
+    ///
+    /// An optional index of the first matching entry, or None if no entry matches
     pub fn find_xref_index<F>(&self, visit: F) -> Option<usize>
     where
         F: Fn(&XEntry) -> bool,
     {
         self.xrefs.iter().position(visit)
     }
-    /// Get PDF version
+
+    /// Gets the PDF version information.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the PDFVersion struct containing version information
     pub fn get_version(&self) -> &PDFVersion {
         &self.version
     }
-    /// Read object from PDFDocument
+
+    /// Reads an object from the PDF document by its index.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The index of the object to read from the cross-reference table
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an optional PDFObject (None if the index is out of bounds
+    /// or the object is freed) or an error if reading/parsing fails
     pub fn read_object(&mut self, index: usize) -> Result<Option<PDFObject>> {
         if index >= self.xrefs.len() {
             return Ok(None);
@@ -77,12 +131,29 @@ impl PDFDocument {
         Ok(Some(object))
     }
 
-    /// Get pdf page number
+    /// Gets the total number of pages in the PDF document.
+    ///
+    /// # Returns
+    ///
+    /// The number of pages in the document
     pub fn get_page_num(&self) -> usize {
         self.page_tree_arena.get_page_num()
     }
 }
 
+/// Parses the PDF version from the beginning of the document.
+///
+/// This function reads the first few bytes of a PDF document to extract and validate
+/// the PDF version information.
+///
+/// # Arguments
+///
+/// * `sequence` - A mutable reference to a sequence implementation for reading bytes
+///
+/// # Returns
+///
+/// A `Result` containing the parsed PDFVersion or an error if the version cannot be
+/// parsed or is invalid
 fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
     let mut buf = [0u8; 1024];
     let n = sequence.read(&mut buf)?;
@@ -102,7 +173,22 @@ fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
     Ok(version.try_into()?)
 }
 
-fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, (u64, u64))> {
+/// Merges cross-reference tables from a PDF document.
+///
+/// This function parses and merges multiple cross-reference tables that may exist
+/// in a PDF document, handling cases where there are previous xref tables referenced
+/// in the document trailer.
+///
+/// # Arguments
+///
+/// * `tokenizer` - A mutable reference to the tokenizer for parsing PDF content
+///
+/// # Returns
+///
+/// A `Result` containing a tuple with the merged vector of XEntry objects and
+/// a tuple of the catalog object number and generation number, or an error if
+/// parsing fails
+fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, (u32, u16))> {
     let mut xrefs = Vec::<XEntry>::new();
     let mut root = None;
     loop {
@@ -136,6 +222,20 @@ fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, (u64,
         return Err(PDFParseError("Xref table broken."));
     }
 }
+
+/// Calculates the offset of the cross-reference table in the PDF document.
+///
+/// This function searches for the "startxref" keyword near the end of the document
+/// and extracts the offset value that points to the beginning of the cross-reference table.
+///
+/// # Arguments
+///
+/// * `sequence` - A mutable reference to a sequence implementation for reading bytes
+///
+/// # Returns
+///
+/// A `Result` containing the calculated offset as a u64 value, or an error if the
+/// startxref keyword cannot be found or the offset cannot be parsed
 fn cal_xref_table_offset(sequence: &mut impl Sequence) -> Result<u64> {
     let size = sequence.size()?;
     let pos = if size > 1024 { size - 1024 } else { 0 };

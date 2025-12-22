@@ -54,7 +54,7 @@ fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
                 }
                 let is_obj = tokenizer.check_next_token(|token| token.key_was(R) || token.key_was(OBJ))?;
                 if is_obj {
-                    return parse_obj(tokenizer, Some(value))
+                    return parse_obj(tokenizer, Some(value as u32))
                 }
                 Ok(PDFObject::Number(number))
             }
@@ -66,12 +66,12 @@ fn parser0(tokenizer: &mut Tokenizer, token: Token) -> Result<PDFObject> {
 }
 
 pub(crate) fn parse_text_xref(tokenizer: &mut Tokenizer) -> Result<Vec<XEntry>> {
-    let obj_num = tokenizer.next_token()?.as_u64()?;
-    let length = tokenizer.next_token()?.as_u64()?;
+    let obj_num = tokenizer.next_token()?.as_u32()?;
+    let length = tokenizer.next_token()?.as_u32()?;
     let mut entries = Vec::<XEntry>::new();
     for i in 0..length {
         let value = tokenizer.next_token()?.as_u64()?;
-        let gen_num = tokenizer.next_token()?.as_u64()?;
+        let gen_num = tokenizer.next_token()?.as_u16()?;
         let state = tokenizer.next_token()?.to_string();
         let using = match state.as_str() {
             "n" => true,
@@ -90,14 +90,14 @@ pub(crate) fn parse_text_xref(tokenizer: &mut Tokenizer) -> Result<Vec<XEntry>> 
     Ok(entries)
 }
 
-fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u64>) -> Result<PDFObject> {
+fn parse_obj(tokenizer: &mut Tokenizer, option: Option<u32>) -> Result<PDFObject> {
     let obj_num = match option {
         Some(num) => num,
-        None => tokenizer.next_token()?.as_u64()?
+        None => tokenizer.next_token()?.as_u32()?
     };
     let obj_gen_token = tokenizer.next_token()?.except(|token| token.is_u64())?;
     let type_token = tokenizer.next_token()?.except(|token| token.key_was(R) || token.key_was(OBJ))?;
-    let gen_num = obj_gen_token.as_u64()?;
+    let gen_num = obj_gen_token.as_u16()?;
     if let Key(ref key) = type_token {
         let object = match key.as_str() {
             OBJ => {
@@ -160,20 +160,20 @@ fn parse_array(tokenizer: &mut Tokenizer) -> Result<PDFObject> {
     }
 }
 
-fn parse_string(tokenizer: &mut Tokenizer, post_script: bool) -> Result<PDFObject> {
-    let end_chr = if post_script { ')' } else { '>' };
-    let mut is_escape = true;
+fn parse_string(tokenizer: &mut Tokenizer, literal_str: bool) -> Result<PDFObject> {
+    let end_chr = if literal_str { ')' } else { '>' };
+    let mut is_escape = false;
     let result = tokenizer.loop_util(&[], |chr| {
-        is_escape = (chr == '\\') && !is_escape;
-        Ok(is_escape || chr == end_chr)
+        is_escape = chr == '\\' && !is_escape;
+        Ok(chr == end_chr && !is_escape)
     });
     match result {
         Ok(range) => {
             let buf = tokenizer.drain_from_buf(range);
-            let buf = if post_script {
-                hex2bytes(&buf)
-            } else {
+            let buf = if literal_str {
                 buf
+            } else {
+                hex2bytes(&buf)
             };
             // Remove '>' or ')'
             tokenizer.remove_buf_len(1);

@@ -22,7 +22,7 @@ pub enum PDFError {
     #[error("{0}")]
     PDFParseError0(String),
     #[error("Xref entry:({0},{1}) not found")]
-    XrefEntryNotFound(u64,u64),
+    XrefEntryNotFound(u32,u16),
     #[error("{0}")]
     ObjectAttrMiss(&'static str),
     #[error("End of file error")]

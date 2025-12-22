@@ -79,6 +79,20 @@ impl Token {
         Err(PDFParseError0(format!("Token can't convert to u64:'{}'",self.to_string())))
     }
 
+    pub(crate) fn as_u32(&self) -> Result<u32> {
+        if let Number(PDFNumber::Unsigned(num)) = self {
+            return Ok(*num as u32);
+        }
+        Err(PDFParseError0(format!("Token can't convert to u32:'{}'", self.to_string())))
+    }
+    
+    pub(crate) fn as_u16(&self) -> Result<u16> {
+        if let Number(PDFNumber::Unsigned(num)) = self {
+            return Ok(*num as u16);
+        }
+        Err(PDFParseError0(format!("Token can't convert to u16:'{}'", self.to_string())))
+    }
+
     pub(crate) fn except<F>(self, func: F) -> Result<Self>
     where
         F: Fn(&Token) -> bool,
