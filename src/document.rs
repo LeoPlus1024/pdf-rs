@@ -1,15 +1,19 @@
 use crate::catalog::{decode_catalog_data, OutlineTreeArean, PageTreeArean};
 use crate::constants::pdf_key::{START_XREF, XREF};
-use crate::constants::{PREV, ROOT};
-use crate::error::PDFError::{InvalidPDFDocument, PDFParseError, XrefTableNotFound};
+use crate::constants::{INFO, PREV, ROOT};
+use crate::error::PDFError::{InvalidPDFDocument, ObjectAttrMiss, PDFParseError, XrefTableNotFound};
 use crate::error::Result;
 use crate::objects::{PDFNumber, PDFObject, XEntry};
-use crate::parser::{parse, parse_text_xref};
+use crate::parser::{parse, parse_text_xref, parse_with_offset};
 use crate::sequence::{FileSequence, Sequence};
 use crate::tokenizer::Tokenizer;
-use crate::utils::{count_leading_line_endings, line_ending, literal_to_u64};
+use crate::utils::{count_leading_line_endings, line_ending, literal_to_u64, xrefs_search};
 use std::path::PathBuf;
 use crate::vpdf::PDFVersion;
+
+pub struct PDFDescribe {
+
+}
 
 /// Represents a PDF document with all its components and functionality.
 ///
@@ -25,7 +29,9 @@ pub struct PDFDocument {
     /// Page tree arena containing the hierarchical page structure.
     page_tree_arena: PageTreeArean,
     /// Outline tree arena containing the hierarchical outline structure.
-    outline_tree_arean: Option<OutlineTreeArean>
+    outline_tree_arean: Option<OutlineTreeArean>,
+    /// Document info
+    describe: Option<PDFDescribe>,
 }
 
 impl PDFDocument {
@@ -65,14 +71,28 @@ impl PDFDocument {
         let mut tokenizer = Tokenizer::new(sequence);
         tokenizer.seek(offset)?;
         // Merge all xref table
-        let (xrefs, catalog) = merge_xref_table(&mut tokenizer)?;
-        let (page_tree_arena, outline_tree_arean) = decode_catalog_data(&mut tokenizer,catalog,&xrefs)?;
+        let (xrefs, catalog,info) = merge_xref_table(&mut tokenizer)?;
+        let (page_tree_arena, outline_tree_arean) = match catalog {
+            Some(catalog) => decode_catalog_data(&mut tokenizer, catalog, &xrefs)?,
+            None => return Err(ObjectAttrMiss("Trailer can't found catalog attr.")),
+        };
+        let mut describe = None;
+        // Parse document info
+        if let Some(obj) = info {
+            let entry = xrefs_search(&xrefs, obj)?;
+            if let PDFObject::IndirectObject(_, _, value) = parse_with_offset(&mut tokenizer, entry.value)? {
+                if let PDFObject::Dict(dict) = *value {
+                    describe = Some(PDFDescribe::new());
+                }
+            }
+        }
         let document = PDFDocument {
             xrefs,
             version,
             tokenizer,
             page_tree_arena,
-            outline_tree_arean
+            outline_tree_arean,
+            describe,
         };
         Ok(document)
     }
@@ -191,9 +211,10 @@ fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
 /// A `Result` containing a tuple with the merged vector of XEntry objects and
 /// a tuple of the catalog object number and generation number, or an error if
 /// parsing fails
-fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, (u32, u16))> {
+fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, Option<(u32, u16)>, Option<(u32, u16)>)> {
     let mut xrefs = Vec::<XEntry>::new();
-    let mut root = None;
+    let mut info = None;
+    let mut catalog = None;
     loop {
         let is_xref = tokenizer.check_next_token0(false, |token| token.key_was(XREF))?;
         if !is_xref {
@@ -210,17 +231,19 @@ fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, (u32,
             }
         }
         if let PDFObject::Dict(mut dictionary) = parse(&mut tokenizer)? {
-            if let Some(obj) = dictionary.remove(ROOT) {
-                root = Some(obj);
+            if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = dictionary.get(ROOT) {
+                catalog = Some((*obj_num, *gen_num));
+                if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = dictionary.get(INFO)
+                {
+                    info = Some((*obj_num, *gen_num));
+                }
             }
             // Recursive previous xref
             if let Some(PDFObject::Number(PDFNumber::Unsigned(prev))) = dictionary.get(PREV) {
                 tokenizer.seek(*prev)?;
                 continue;
             }
-            if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = root {
-                return Ok((xrefs, (obj_num, gen_num)));
-            }
+            return Ok((xrefs, catalog, info));
         }
         return Err(PDFParseError("Xref table broken."));
     }
@@ -277,4 +300,10 @@ fn cal_xref_table_offset(sequence: &mut impl Sequence) -> Result<u64> {
     }
     let offset = literal_to_u64(&buf[start..end]);
     Ok(offset)
+}
+
+impl PDFDescribe {
+    pub(crate) fn new() -> PDFDescribe {
+        PDFDescribe {}
+    }
 }

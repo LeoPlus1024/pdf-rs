@@ -75,3 +75,5 @@ pub(crate) const FIRST: &str = "First";
 pub(crate) const LAST: &str = "Last";
 
 pub(crate) const NEXT: &str = "Next";
+
+pub(crate) const INFO: &str = "Info";
