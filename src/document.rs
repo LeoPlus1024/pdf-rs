@@ -1,15 +1,20 @@
-use crate::catalog::{decode_catalog_data, OutlineTreeArean, PageTreeArean};
+use crate::catalog::{OutlineTreeArean, PageTreeArean, decode_catalog_data};
 use crate::constants::pdf_key::{START_XREF, XREF};
-use crate::constants::{INFO, PREV, ROOT};
-use crate::error::PDFError::{InvalidPDFDocument, ObjectAttrMiss, PDFParseError, XrefTableNotFound};
+use crate::constants::{AUTHOR, CREATION_DATE, CREATOR, INFO, PREV, PRODUCER, ROOT, TITLE};
+use crate::encoding::PreDefinedEncoding;
+use crate::error::PDFError::{
+    InvalidPDFDocument, ObjectAttrMiss, PDFParseError, XrefTableNotFound,
+};
 use crate::error::Result;
 use crate::objects::{Dictionary, PDFNumber, PDFObject, XEntry};
 use crate::parser::{parse, parse_text_xref, parse_with_offset};
+use crate::pstr::convert_glyph_text;
 use crate::sequence::{FileSequence, Sequence};
 use crate::tokenizer::Tokenizer;
 use crate::utils::{count_leading_line_endings, line_ending, literal_to_u64, xrefs_search};
-use std::path::PathBuf;
 use crate::vpdf::PDFVersion;
+use std::path::PathBuf;
+use crate::convert_glyph_from_dict;
 
 pub struct PDFDescribe {
     /// (Optional) The name of the application that converted the document from its native format to
@@ -84,7 +89,7 @@ impl PDFDocument {
         let mut tokenizer = Tokenizer::new(sequence);
         tokenizer.seek(offset)?;
         // Merge all xref table
-        let (xrefs, catalog,info) = merge_xref_table(&mut tokenizer)?;
+        let (xrefs, catalog, info) = merge_xref_table(&mut tokenizer)?;
         let (page_tree_arena, outline_tree_arean) = match catalog {
             Some(catalog) => decode_catalog_data(&mut tokenizer, catalog, &xrefs)?,
             None => return Err(ObjectAttrMiss("Trailer can't found catalog attr.")),
@@ -93,7 +98,9 @@ impl PDFDocument {
         // Parse document info
         if let Some(obj) = info {
             let entry = xrefs_search(&xrefs, obj)?;
-            if let PDFObject::IndirectObject(_, _, value) = parse_with_offset(&mut tokenizer, entry.value)? {
+            if let PDFObject::IndirectObject(_, _, value) =
+                parse_with_offset(&mut tokenizer, entry.value)?
+            {
                 if let PDFObject::Dict(dict) = *value {
                     describe = Some(PDFDescribe::new(dict));
                 }
@@ -224,7 +231,9 @@ fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
 /// A `Result` containing a tuple with the merged vector of XEntry objects and
 /// a tuple of the catalog object number and generation number, or an error if
 /// parsing fails
-fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, Option<(u32, u16)>, Option<(u32, u16)>)> {
+fn merge_xref_table(
+    mut tokenizer: &mut Tokenizer,
+) -> Result<(Vec<XEntry>, Option<(u32, u16)>, Option<(u32, u16)>)> {
     let mut xrefs = Vec::<XEntry>::new();
     let mut info = None;
     let mut catalog = None;
@@ -246,8 +255,7 @@ fn merge_xref_table(mut tokenizer: &mut Tokenizer) -> Result<(Vec<XEntry>, Optio
         if let PDFObject::Dict(mut dictionary) = parse(&mut tokenizer)? {
             if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = dictionary.get(ROOT) {
                 catalog = Some((*obj_num, *gen_num));
-                if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = dictionary.get(INFO)
-                {
+                if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = dictionary.get(INFO) {
                     info = Some((*obj_num, *gen_num));
                 }
             }
@@ -317,12 +325,18 @@ fn cal_xref_table_offset(sequence: &mut impl Sequence) -> Result<u64> {
 
 impl PDFDescribe {
     pub(crate) fn new(dictionary: Dictionary) -> PDFDescribe {
+        let encoding = PreDefinedEncoding::PDFDoc;
+        let producer = convert_glyph_from_dict!(dictionary, PRODUCER, &encoding);
+        let creator = convert_glyph_from_dict!(dictionary, CREATOR, &encoding);
+        let creation_date = convert_glyph_from_dict!(dictionary, CREATION_DATE, &encoding);
+        let author = convert_glyph_from_dict!(dictionary, AUTHOR, &encoding);
+        let title = convert_glyph_from_dict!(dictionary, TITLE, &encoding);
         PDFDescribe {
-            producer:None,
-            creator: None,
-            creation_date:None,
-            author: None,
-            title: None,
+            producer,
+            creator,
+            creation_date,
+            author,
+            title,
             mod_date: None,
         }
     }

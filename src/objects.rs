@@ -409,7 +409,15 @@ impl Stream {
 }
 
 impl PDFString {
-    pub(crate) fn new(kind: PDFStrKind,buf: Vec<u8>) -> Self {
+    pub(crate) fn new(kind: PDFStrKind, buf: Vec<u8>) -> Self {
         PDFString { kind, buf }
+    }
+
+    pub(crate) fn get_buf(&self) -> &Vec<u8> {
+        &self.buf
+    }
+
+    pub(crate) fn get_kind(&self) -> &PDFStrKind {
+        &self.kind
     }
 }

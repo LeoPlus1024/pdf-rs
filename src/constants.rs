@@ -77,3 +77,8 @@ pub(crate) const LAST: &str = "Last";
 pub(crate) const NEXT: &str = "Next";
 
 pub(crate) const INFO: &str = "Info";
+pub(crate) const PRODUCER: &str = "Producer";
+pub(crate) const CREATOR: &str = "Creator";
+pub(crate) const CREATION_DATE: &str = "CreationDate";
+pub(crate) const AUTHOR: &str = "Author";
+pub(crate) const TITLE: &str = "Title";
