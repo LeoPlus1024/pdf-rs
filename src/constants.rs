@@ -82,3 +82,4 @@ pub(crate) const CREATOR: &str = "Creator";
 pub(crate) const CREATION_DATE: &str = "CreationDate";
 pub(crate) const AUTHOR: &str = "Author";
 pub(crate) const TITLE: &str = "Title";
+pub(crate) const MOD_DATE:&str = "ModDate";

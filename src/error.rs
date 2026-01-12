@@ -34,5 +34,7 @@ pub enum PDFError {
     #[error("{0}")]
     FloatParseError(#[from] ParseFloatError),
     #[error("{0}")]
-    PDFObjectCastError(&'static str)
+    PDFObjectCastError(&'static str),
+    #[error("Illegal date format:{0}")]
+    IllegalDateFormat(String),
 }

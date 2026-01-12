@@ -1,6 +1,6 @@
 use crate::catalog::{OutlineTreeArean, PageTreeArean, decode_catalog_data};
 use crate::constants::pdf_key::{START_XREF, XREF};
-use crate::constants::{AUTHOR, CREATION_DATE, CREATOR, INFO, PREV, PRODUCER, ROOT, TITLE};
+use crate::constants::{AUTHOR, CREATION_DATE, CREATOR, INFO, MOD_DATE, PREV, PRODUCER, ROOT, TITLE};
 use crate::encoding::PreDefinedEncoding;
 use crate::error::PDFError::{
     InvalidPDFDocument, ObjectAttrMiss, PDFParseError, XrefTableNotFound,
@@ -14,7 +14,9 @@ use crate::tokenizer::Tokenizer;
 use crate::utils::{count_leading_line_endings, line_ending, literal_to_u64, xrefs_search};
 use crate::vpdf::PDFVersion;
 use std::path::PathBuf;
+use std::str::FromStr;
 use crate::convert_glyph_from_dict;
+use crate::date::Date;
 
 pub struct PDFDescribe {
     /// (Optional) The name of the application that converted the document from its native format to
@@ -26,11 +28,15 @@ pub struct PDFDescribe {
     /// The date the document was created. It should be stored in an unambiguous format.
     /// For example, 11 October 1992 13:11 is preferable to 11/10/92 1:11 pm. The date should
     /// be in the same language as the document content.
-    creation_date: Option<String>,
+    creation_date: Option<Date>,
     /// (Optional) The name of the person who created the document.
     author: Option<String>,
+    /// (Optional; PDF 1.1) The document’s title.
     title: Option<String>,
-    mod_date: Option<String>,
+    /// (Required if PieceInfo is present in the document catalogue;
+    /// otherwise optional; PDF 1.1) The date and time the document was
+    /// most recently modified, in human-readable form (see 7.9.4, “Dates”).
+    mod_date: Option<Date>,
 }
 
 /// Represents a PDF document with all its components and functionality.
@@ -203,12 +209,7 @@ fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
     if n < 8 {
         return Err(InvalidPDFDocument);
     }
-    if buf.len() < 8
-        || buf[0] != b'%'
-        || buf[1] != b'P'
-        || buf[2] != b'D'
-        || buf[3] != b'F'
-        || buf[4] != b'-'
+    if buf.len() < 8 || !buf.starts_with(b"%PDF-")
     {
         return Err(InvalidPDFDocument);
     }
@@ -328,7 +329,16 @@ impl PDFDescribe {
         let encoding = PreDefinedEncoding::PDFDoc;
         let producer = convert_glyph_from_dict!(dictionary, PRODUCER, &encoding);
         let creator = convert_glyph_from_dict!(dictionary, CREATOR, &encoding);
-        let creation_date = convert_glyph_from_dict!(dictionary, CREATION_DATE, &encoding);
+        let creation_date = convert_glyph_from_dict!(dictionary, CREATION_DATE, &encoding)
+            .map_or(None, |text| match Date::from_str(text.as_str()) {
+                Ok(date) => Some(date),
+                Err(_) => None,
+            });
+        let mod_date = convert_glyph_from_dict!(dictionary, MOD_DATE, &encoding)
+            .map_or(None, |text| match Date::from_str(text.as_str()) {
+                Ok(date) => Some(date),
+                Err(_) => None,
+            });
         let author = convert_glyph_from_dict!(dictionary, AUTHOR, &encoding);
         let title = convert_glyph_from_dict!(dictionary, TITLE, &encoding);
         PDFDescribe {
@@ -337,7 +347,7 @@ impl PDFDescribe {
             creation_date,
             author,
             title,
-            mod_date: None,
+            mod_date
         }
     }
 }
