@@ -1,38 +1,17 @@
+/// MacExpertEncoding as defined in Adobe Technical Note #5014
+/// Used for expert fonts (small caps, old-style figures, etc.)
 const MAC_EXPERT_ENCODING: [EncodingEntry; 256] = [
-    (0, ".notdef", None),
-    (1, ".notdef", None),
-    (2, ".notdef", None),
-    (3, ".notdef", None),
-    (4, ".notdef", None),
-    (5, ".notdef", None),
-    (6, ".notdef", None),
-    (7, ".notdef", None),
-    (8, ".notdef", None),
-    (9, "tab", Some('\t')),
-    (10, "lf", Some('\n')),
-    (11, ".notdef", None),
-    (12, "ff", Some('\x0C')),
-    (13, "cr", Some('\r')),
-    (14, ".notdef", None),
-    (15, ".notdef", None),
-    (16, ".notdef", None),
-    (17, ".notdef", None),
-    (18, ".notdef", None),
-    (19, ".notdef", None),
-    (20, ".notdef", None),
-    (21, ".notdef", None),
-    (22, ".notdef", None),
-    (23, ".notdef", None),
-    (24, ".notdef", None),
-    (25, ".notdef", None),
-    (26, ".notdef", None),
-    (27, ".notdef", None),
-    (28, ".notdef", None),
-    (29, ".notdef", None),
-    (30, ".notdef", None),
-    (31, ".notdef", None),
+    // 0-31: Control characters (undefined)
+    (0, ".notdef", None), (1, ".notdef", None), (2, ".notdef", None), (3, ".notdef", None),
+    (4, ".notdef", None), (5, ".notdef", None), (6, ".notdef", None), (7, ".notdef", None),
+    (8, ".notdef", None), (9, "tab", Some('\t')), (10, "lf", Some('\n')), (11, ".notdef", None),
+    (12, "ff", Some('\x0C')), (13, "cr", Some('\r')), (14, ".notdef", None), (15, ".notdef", None),
+    (16, ".notdef", None), (17, ".notdef", None), (18, ".notdef", None), (19, ".notdef", None),
+    (20, ".notdef", None), (21, ".notdef", None), (22, ".notdef", None), (23, ".notdef", None),
+    (24, ".notdef", None), (25, ".notdef", None), (26, ".notdef", None), (27, ".notdef", None),
+    (28, ".notdef", None), (29, ".notdef", None), (30, ".notdef", None), (31, ".notdef", None),
 
-    // 32-63: 基本符号和数字前段
+    // 32-63: Basic punctuation and digits
     (32, "space", Some(' ')),
     (33, "exclam", Some('!')),
     (34, "quotedbl", Some('"')),
@@ -66,7 +45,7 @@ const MAC_EXPERT_ENCODING: [EncodingEntry; 256] = [
     (62, "greater", Some('>')),
     (63, "question", Some('?')),
 
-    // 64-95: 大写字母与部分符号
+    // 64-95: Uppercase letters and symbols
     (64, "at", Some('@')),
     (65, "A", Some('A')),
     (66, "B", Some('B')),
@@ -100,6 +79,7 @@ const MAC_EXPERT_ENCODING: [EncodingEntry; 256] = [
     (94, "asciicircum", Some('^')),
     (95, "underscore", Some('_')),
 
+    // 96-127: Lowercase and symbols
     (96, "quoteleft", Some('`')),
     (97, "a", Some('a')),
     (98, "b", Some('b')),
@@ -133,133 +113,111 @@ const MAC_EXPERT_ENCODING: [EncodingEntry; 256] = [
     (126, "asciitilde", Some('~')),
     (127, ".notdef", None),
 
-    (128, ".notdef", None),
-    (129, ".notdef", None),
-    (130, ".notdef", None),
-    (131, ".notdef", None),
-    (132, ".notdef", None),
-    (133, ".notdef", None),
-    (134, ".notdef", None),
-    (135, ".notdef", None),
-    (136, ".notdef", None),
-    (137, ".notdef", None),
-    (138, ".notdef", None),
-    (139, ".notdef", None),
-    (140, ".notdef", None),
-    (141, ".notdef", None),
-    (142, ".notdef", None),
-    (143, ".notdef", None),
-    (144, ".notdef", None),
-    (145, ".notdef", None),
-    (146, ".notdef", None),
-    (147, ".notdef", None),
-    (148, ".notdef", None),
-    (149, ".notdef", None),
-    (150, ".notdef", None),
-    (151, ".notdef", None),
-    (152, ".notdef", None),
-    (153, ".notdef", None),
-    (154, ".notdef", None),
-    (155, ".notdef", None),
-    (156, ".notdef", None),
-    (157, ".notdef", None),
-    (158, ".notdef", None),
-    (159, ".notdef", None),
+    // 128-159: Undefined in MacExpertEncoding
+    (128, ".notdef", None), (129, ".notdef", None), (130, ".notdef", None), (131, ".notdef", None),
+    (132, ".notdef", None), (133, ".notdef", None), (134, ".notdef", None), (135, ".notdef", None),
+    (136, ".notdef", None), (137, ".notdef", None), (138, ".notdef", None), (139, ".notdef", None),
+    (140, ".notdef", None), (141, ".notdef", None), (142, ".notdef", None), (143, ".notdef", None),
+    (144, ".notdef", None), (145, ".notdef", None), (146, ".notdef", None), (147, ".notdef", None),
+    (148, ".notdef", None), (149, ".notdef", None), (150, ".notdef", None), (151, ".notdef", None),
+    (152, ".notdef", None), (153, ".notdef", None), (154, ".notdef", None), (155, ".notdef", None),
+    (156, ".notdef", None), (157, ".notdef", None), (158, ".notdef", None), (159, ".notdef", None),
 
-    (160, "space", Some('\u{00A0}')),         // no-break space
-    (161, "exclamsmall", Some('\u{F721}')),   // small !
-    (162, "Hungarumlautsmall", Some('\u{F6F8}')), // double acute accent
-    (163, "dollaroldstyle", Some('\u{F724}')), // old-style $
-    (164, "dollarsuperior", Some('\u{F724}')), // superior $
-    (165, "ampersandsmall", Some('\u{F726}')), // small &
-    (166, "Acutesmall", Some('\u{F7B4}')),     // small acute
-    (167, "parenleftsuperior", Some('\u{F6DB}')), // superior (
-    (168, "parenrightsuperior", Some('\u{F6DC}')), // superior )
-    (169, "twosuperior", Some('²')),
-    (170, "threesuperior", Some('³')),
-    (171, "onesuperior", Some('¹')),
-    (172, "sixsuperior", Some('\u{2076}')),
-    (173, "sevensuperior", Some('\u{2077}')),
-    (174, "zerosuperior", Some('⁰')),
-    (175, "foursuperior", Some('\u{2074}')),
-    (176, "fivesuperior", Some('\u{2075}')),
-    (177, "ninesuperior", Some('\u{2079}')),
-    (178, "eightsuperior", Some('\u{2078}')),
-    (179, "commasuperior", Some('\u{F6E5}')),
-    (180, "hyphensuperior", Some('\u{F6E4}')),
-    (181, "periodsuperior", Some('\u{F6E3}')),
-    (182, "quesstionsmall", Some('\u{F6F5}')),
-    (183, "Gravesmall", Some('\u{F760}')),
-    (184, "Asmallcap", Some('\u{F761}')),
-    (185, "Bsmallcap", Some('\u{F762}')),
-    (186, "Csmallcap", Some('\u{F763}')),
-    (187, "Dsmallcap", Some('\u{F764}')),
-    (188, "Esmallcap", Some('\u{F765}')),
-    (189, "Fsmallcap", Some('\u{F766}')),
-    (190, "Gsmallcap", Some('\u{F767}')),
-    (191, "Hsmallcap", Some('\u{F768}')),
-    (192, "Ismallcap", Some('\u{F769}')),
-    (193, "Jsmallcap", Some('\u{F76A}')),
-    (194, "Ksmallcap", Some('\u{F76B}')),
-    (195, "Lsmallcap", Some('\u{F76C}')),
-    (196, "Msmallcap", Some('\u{F76D}')),
-    (197, "Nsmallcap", Some('\u{F76E}')),
-    (198, "Osmallcap", Some('\u{F76F}')),
-    (199, "Psmallcap", Some('\u{F770}')),
-    (200, "Qsmallcap", Some('\u{F771}')),
-    (201, "Rsmallcap", Some('\u{F772}')),
-    (202, "Ssmallcap", Some('\u{F773}')),
-    (203, "Tsmallcap", Some('\u{F774}')),
-    (204, "Usmallcap", Some('\u{F775}')),
-    (205, "Vsmallcap", Some('\u{F776}')),
-    (206, "Wsmallcap", Some('\u{F777}')),
-    (207, "Xsmallcap", Some('\u{F778}')),
-    (208, "Ysmallcap", Some('\u{F779}')),
-    (209, "Zsmallcap", Some('\u{F77A}')),
-    (210, "exclamdownsmall", Some('\u{F6ED}')),
-    (211, "centoldstyle", Some('\u{F763}')),       // old-style cent
-    (212, "centssuperior", Some('\u{F763}')),      // superior cent
-    (213, "scalaron", Some('š')),
-    (214, "tonossuperior", Some('\u{F6F9}')),
-    (215, "hungarumlautnorwegian", Some('˝')),     // Hungarian umlaut
-    (216, "Lslashsmall", Some('\u{F6FA}')),
-    (217, "circlecenteropen", Some('\u{F6FB}')),
-    (218, "periodcenteredsmall", Some('\u{F6EC}')),
-    (219, "colonsmall", Some('\u{F6F1}')),
-    (220, "commareversed", Some('\u{F6F2}')),
-    (221, "hyphenbullet", Some('\u{F6F3}')),
-    (222, "gravefullstop", Some('\u{F6F4}')),
-    (223, "afii57929", Some('\u{F6F6}')),          // special ligature?
-    (224, "afii57930", Some('\u{F6F7}')),
-    (225, "afii57641", Some('\u{F6EE}')),         // dotless j?
-    (226, "afii57642", Some('\u{F6EF}')),
-    (227, "afii57643", Some('\u{F6E0}')),
-    (228, "afii57644", Some('\u{F6E1}')),
-    (229, "afii57645", Some('\u{F6E2}')),
-    (230, "afii57658", Some('\u{F6E6}')),
-    (231, "afii57659", Some('\u{F6E7}')),
-    (232, "afii57660", Some('\u{F6E8}')),
-    (233, "afii57661", Some('\u{F6E9}')),
-    (234, "afii57662", Some('\u{F6EA}')),
-    (235, "afii57663", Some('\u{F6EB}')),
-    (236, "afii57664", Some('\u{F6EC}')),
-    (237, "afii57665", Some('\u{F6ED}')),
-    (238, "afii57666", Some('\u{F6EE}')),
-    (239, "afii57667", Some('\u{F6EF}')),
-    (240, "afii57668", Some('\u{F6F0}')),
-    (241, "afii57669", Some('\u{F6F1}')),
-    (242, "afii57670", Some('\u{F6F2}')),
-    (243, "afii57671", Some('\u{F6F3}')),
-    (244, "afii57672", Some('\u{F6F4}')),
-    (245, "afii57673", Some('\u{F6F5}')),
-    (246, "afii57674", Some('\u{F6F6}')),
-    (247, "afii57675", Some('\u{F6F7}')),
-    (248, "afii57676", Some('\u{F6F8}')),
-    (249, "afii57677", Some('\u{F6F9}')),
-    (250, "afii57678", Some('\u{F6FA}')),
-    (251, "afii57679", Some('\u{F6FB}')),
-    (252, "afii57680", Some('\u{F6FC}')),
-    (253, "afii57681", Some('\u{F6FD}')),
-    (254, "afii57682", Some('\u{F6FE}')),
-    (255, "afii57683", Some('\u{F6FF}')),
+    // 160-255: Expert characters (small caps, superior, ligatures, etc.)
+    (160, "space", Some('\u{00A0}')),           // no-break space
+    (161, "exclamsmall", Some('!')),            // small '!'
+    (162, "Hungarumlautsmall", None),           // double acute (no standard Unicode)
+    (163, "dollaroldstyle", Some('$')),         // old-style $
+    (164, "dollarsuperior", Some('$')),         // superior $
+    (165, "ampersandsmall", Some('&')),         // small &
+    (166, "Acutesmall", None),                  // acute accent (no standard)
+    (167, "parenleftsuperior", None),           // superior (
+    (168, "parenrightsuperior", None),          // superior )
+    (169, "twosuperior", Some('²')),            // ²
+    (170, "threesuperior", Some('³')),           // ³
+    (171, "onesuperior", Some('¹')),             // ¹
+    (172, "sixsuperior", Some('\u{2076}')),     // ⁶
+    (173, "sevensuperior", Some('\u{2077}')),   // ⁷
+    (174, "zerosuperior", Some('⁰')),            // ⁰
+    (175, "foursuperior", Some('\u{2074}')),    // ⁴
+    (176, "fivesuperior", Some('\u{2075}')),    // ⁵
+    (177, "ninesuperior", Some('\u{2079}')),    // ⁹
+    (178, "eightsuperior", Some('\u{2078}')),   // ⁸
+    (179, "commasuperior", None),               // superior ,
+    (180, "hyphensuperior", None),              // superior -
+    (181, "periodsuperior", None),              // superior .
+    (182, "questiondownsmall", Some('¿')),      // ¿ small
+    (183, "Gravesmall", None),                  // grave accent
+    (184, "Asmallcap", Some('A')),              // small cap A → semantically 'A'
+    (185, "Bsmallcap", Some('B')),
+    (186, "Csmallcap", Some('C')),
+    (187, "Dsmallcap", Some('D')),
+    (188, "Esmallcap", Some('E')),
+    (189, "Fsmallcap", Some('F')),
+    (190, "Gsmallcap", Some('G')),
+    (191, "Hsmallcap", Some('H')),
+    (192, "Ismallcap", Some('I')),
+    (193, "Jsmallcap", Some('J')),
+    (194, "Ksmallcap", Some('K')),
+    (195, "Lsmallcap", Some('L')),
+    (196, "Msmallcap", Some('M')),
+    (197, "Nsmallcap", Some('N')),
+    (198, "Osmallcap", Some('O')),
+    (199, "Psmallcap", Some('P')),
+    (200, "Qsmallcap", Some('Q')),
+    (201, "Rsmallcap", Some('R')),
+    (202, "Ssmallcap", Some('S')),
+    (203, "Tsmallcap", Some('T')),
+    (204, "Usmallcap", Some('U')),
+    (205, "Vsmallcap", Some('V')),
+    (206, "Wsmallcap", Some('W')),
+    (207, "Xsmallcap", Some('X')),
+    (208, "Ysmallcap", Some('Y')),
+    (209, "Zsmallcap", Some('Z')),
+    (210, "exclamdownsmall", Some('¡')),        // ¡ small
+    (211, "centoldstyle", Some('¢')),           // old-style cent → map to ¢
+    (212, "tonossuperior", None),               // tonos (Greek)
+    (213, "caronsmall", None),                  // caron (háček)
+    (214, "tonossuperior", None),
+    (215, "hungarumlautnorwegian", Some('˝')),  // Hungarian umlaut
+    (216, "Lslashsmall", None),
+    (217, "circlecenteropen", None),
+    (218, "periodcenteredsmall", Some('·')),    // middle dot
+    (219, "colonsmall", Some(':')),
+    (220, "commareversed", Some(',')),
+    (221, "hyphenbullet", Some('•')),           // bullet or dash
+    (222, "gravefullstop", None),
+    (223, "afii57929", None),
+    (224, "afii57930", None),
+    (225, "afii57641", None),
+    (226, "afii57642", None),
+    (227, "afii57643", None),
+    (228, "afii57644", None),
+    (229, "afii57645", None),
+    (230, "afii57658", None),
+    (231, "afii57659", None),
+    (232, "afii57660", None),
+    (233, "afii57661", None),
+    (234, "afii57662", None),
+    (235, "afii57663", None),
+    (236, "afii57664", None),
+    (237, "afii57665", None),
+    (238, "afii57666", None),
+    (239, "afii57667", None),
+    (240, "afii57668", None),
+    (241, "afii57669", None),
+    (242, "afii57670", None),
+    (243, "afii57671", None),
+    (244, "afii57672", None),
+    (245, "afii57673", None),
+    (246, "afii57674", None),
+    (247, "afii57675", None),
+    (248, "afii57676", None),
+    (249, "afii57677", None),
+    (250, "afii57678", None),
+    (251, "afii57679", None),
+    (252, "afii57680", None),
+    (253, "afii57681", None),
+    (254, "afii57682", None),
+    (255, "afii57683", None),
 ];

@@ -1,6 +1,5 @@
 use crate::encoding::{PreDefinedEncoding, mapper_chr_from_u8};
 use crate::objects::PDFString;
-use crate::utils::{hex2byte, hex2bytes};
 
 #[macro_export] macro_rules! convert_glyph_from_dict {
     ($dict:ident,$key:ident,$encoding:expr) => {
