@@ -27,6 +27,7 @@ pub struct Stream {
     metadata: Dictionary,
 }
 
+#[derive(PartialEq)]
 pub(crate) enum PDFStrKind {
     Literal,
     Hexadecimal,
@@ -419,5 +420,13 @@ impl PDFString {
 
     pub(crate) fn get_kind(&self) -> &PDFStrKind {
         &self.kind
+    }
+
+    /// Returns true if the string is in UTF-16BE encoding.
+    pub(crate) fn is_utf16be(&self) -> bool {
+        if self.kind == PDFStrKind::Literal {
+            return false;
+        }
+        self.buf.starts_with(b"\xFE\xFF")
     }
 }

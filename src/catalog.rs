@@ -1,4 +1,4 @@
-use crate::constants::{COUNT, FIRST, KIDS, LAST, NEXT, OUTLINES, PAGES, PREV, TYPE};
+use crate::constants::{COUNT, FIRST, KIDS, LAST, NEXT, OUTLINES, PAGES, PREV, TITLE, TYPE};
 use crate::error::PDFError::{ObjectAttrMiss, PDFParseError, XrefEntryNotFound};
 use crate::error::Result;
 use crate::objects::{Dictionary, PDFNumber, PDFObject, XEntry};
@@ -6,6 +6,8 @@ use crate::parser::parse_with_offset;
 use crate::tokenizer::Tokenizer;
 use crate::utils::xrefs_search;
 use std::collections::HashMap;
+use crate::encoding::PreDefinedEncoding;
+use crate::pstr::convert_glyph_text;
 
 macro_rules! mixture_node_id {
     ($obj_num:expr,$gen_num:expr) => {{
@@ -228,7 +230,7 @@ fn build_outline_tree(
         },
         _ => return Err(PDFParseError("Outline object is not an indirect object")),
     };
-    let title = None;
+    let mut title = None;
     let mut prev_id = None;
     let mut next_id = None;
     let mut first_id = None;
@@ -248,6 +250,10 @@ fn build_outline_tree(
     if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = attrs.get(NEXT) {
         next_id = Some(mixture_node_id!(*obj_num, *gen_num));
         build_outline_tree(tokenizer, xrefs, *obj_num, *gen_num, Some(node_id), map)?;
+    }
+
+    if let Some(PDFObject::String(pstr)) = attrs.get(TITLE){
+        title = Some(convert_glyph_text(pstr, &PreDefinedEncoding::PDFDoc));
     }
 
     let count = match attrs.get(COUNT) {

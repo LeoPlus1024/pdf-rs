@@ -1,9 +1,11 @@
-const PDF_DOC_ENCODING: [Option<char>; 255] = [
+const PDF_DOC_ENCODING: [Option<char>; 256] = [
+    // 0x00 - 0x1F: control characters (mostly undefined) → 32 items
     None, None, None, None, None, None, None, None,
     None, Some('\t'), Some('\n'), None, Some('\x0C'), Some('\r'), None, None,
     None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
 
+    // 0x20 - 0x7E: printable ASCII → 95 items
     Some(' '), Some('!'), Some('"'), Some('#'), Some('$'), Some('%'), Some('&'), Some('\''),
     Some('('), Some(')'), Some('*'), Some('+'), Some(','), Some('-'), Some('.'), Some('/'),
     Some('0'), Some('1'), Some('2'), Some('3'), Some('4'), Some('5'), Some('6'), Some('7'),
@@ -17,109 +19,29 @@ const PDF_DOC_ENCODING: [Option<char>; 255] = [
     Some('p'), Some('q'), Some('r'), Some('s'), Some('t'), Some('u'), Some('v'), Some('w'),
     Some('x'), Some('y'), Some('z'), Some('{'), Some('|'), Some('}'), Some('~'),
 
+    // 0x7F: DEL → 1 item
     None,
 
-    Some('€'),
-    None, None, None, None, None, None, None,
+    // 0x80 - 0x9F: undefined → 32 items (NOT 96!)
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None,
 
-    None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None,
-
-    Some('\u{00A0}'), // 160: no-break space
-    Some('¡'),        // 161
-    Some('¢'),        // 162
-    Some('£'),        // 163
-    Some('¤'),        // 164
-    Some('¥'),        // 165
-    Some('¦'),        // 166
-    Some('§'),        // 167
-    Some('¨'),        // 168: spacing diaeresis
-    Some('©'),        // 169
-    Some('ª'),        // 170
-    Some('«'),        // 171
-    Some('¬'),        // 172
-    Some('\u{00AD}'), // 173: soft hyphen
-    Some('®'),        // 174
-    Some('¯'),        // 175: macron
-    Some('°'),        // 176
-    Some('±'),        // 177
-    Some('²'),        // 178
-    Some('³'),        // 179
-    Some('´'),        // 180: acute accent
-    Some('µ'),        // 181: micro sign
-    Some('¶'),        // 182: pilcrow
-    Some('·'),        // 183: middle dot
-    Some('¸'),        // 184: cedilla
-    Some('¹'),        // 185
-    Some('º'),        // 186
-    Some('»'),        // 187
-    Some('¼'),        // 188
-    Some('½'),        // 189
-    Some('¾'),        // 190
-    Some('¿'),        // 191
-    Some('À'),        // 192
-    Some('Á'),        // 193
-    Some('Â'),        // 194
-    Some('Ã'),        // 195
-    Some('Ä'),        // 196
-    Some('Å'),        // 197
-    Some('Æ'),        // 198
-    Some('Ç'),        // 199
-    Some('È'),        // 200
-    Some('É'),        // 201
-    Some('Ê'),        // 202
-    Some('Ë'),        // 203
-    Some('Ì'),        // 204
-    Some('Í'),        // 205
-    Some('Î'),        // 206
-    Some('Ï'),        // 207
-    Some('Ð'),        // 208: Eth
-    Some('Ñ'),        // 209
-    Some('Ò'),        // 210
-    Some('Ó'),        // 211
-    Some('Ô'),        // 212
-    Some('Õ'),        // 213
-    Some('Ö'),        // 214
-    Some('×'),        // 215
-    Some('Ø'),        // 216
-    Some('Ù'),        // 217
-    Some('Ú'),        // 218
-    Some('Û'),        // 219
-    Some('Ü'),        // 220
-    Some('Ý'),        // 221
-    Some('Þ'),        // 222: Thorn
-    Some('ß'),        // 223
-    Some('à'),        // 224
-    Some('á'),        // 225
-    Some('â'),        // 226
-    Some('ã'),        // 227
-    Some('ä'),        // 228
-    Some('å'),        // 229
-    Some('æ'),        // 230
-    Some('ç'),        // 231
-    Some('è'),        // 232
-    Some('é'),        // 233
-    Some('ê'),        // 234
-    Some('ë'),        // 235
-    Some('ì'),        // 236
-    Some('í'),        // 237
-    Some('î'),        // 238
-    Some('ï'),        // 239
-    Some('ð'),        // 240: eth
-    Some('ñ'),        // 241
-    Some('ò'),        // 242
-    Some('ó'),        // 243
-    Some('ô'),        // 244
-    Some('õ'),        // 245
-    Some('ö'),        // 246
-    Some('÷'),        // 247
-    Some('ø'),        // 248
-    Some('ù'),        // 249
-    Some('ú'),        // 250
-    Some('û'),        // 251
-    Some('ü'),        // 252
-    Some('ý'),        // 253
-    Some('þ'),        // 254
-    Some('ÿ'),        // 255
+    // 0xA0 - 0xFF: defined characters → 96 items
+    Some('\u{00A0}'), // no-break space
+    Some('¡'), Some('¢'), Some('£'), Some('¤'), Some('¥'), Some('¦'), Some('§'),
+    Some('¨'), Some('©'), Some('ª'), Some('«'), Some('¬'), Some('\u{00AD}'), Some('®'),
+    Some('¯'), Some('°'), Some('±'), Some('²'), Some('³'), Some('´'), Some('µ'),
+    Some('¶'), Some('·'), Some('¸'), Some('¹'), Some('º'), Some('»'), Some('¼'),
+    Some('½'), Some('¾'), Some('¿'), Some('À'), Some('Á'), Some('Â'), Some('Ã'),
+    Some('Ä'), Some('Å'), Some('Æ'), Some('Ç'), Some('È'), Some('É'), Some('Ê'),
+    Some('Ë'), Some('Ì'), Some('Í'), Some('Î'), Some('Ï'), Some('Ð'), Some('Ñ'),
+    Some('Ò'), Some('Ó'), Some('Ô'), Some('Õ'), Some('Ö'), Some('×'), Some('Ø'),
+    Some('Ù'), Some('Ú'), Some('Û'), Some('Ü'), Some('Ý'), Some('Þ'), Some('ß'),
+    Some('à'), Some('á'), Some('â'), Some('ã'), Some('ä'), Some('å'), Some('æ'),
+    Some('ç'), Some('è'), Some('é'), Some('ê'), Some('ë'), Some('ì'), Some('í'),
+    Some('î'), Some('ï'), Some('ð'), Some('ñ'), Some('ò'), Some('ó'), Some('ô'),
+    Some('õ'), Some('ö'), Some('÷'), Some('ø'), Some('ù'), Some('ú'), Some('û'),
+    Some('ü'), Some('ý'), Some('þ'), Some('ÿ'),
 ];
