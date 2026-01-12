@@ -188,6 +188,15 @@ impl PDFDocument {
     pub fn get_page_num(&self) -> usize {
         self.page_tree_arena.get_page_num()
     }
+
+    /// Gets the page tree arena
+    ///
+    /// # Returns
+    ///
+    /// The page tree arena
+    pub fn get_page_tree(&self)->&PageTreeArean{
+        &self.page_tree_arena
+    }
 }
 
 /// Parses the PDF version from the beginning of the document.

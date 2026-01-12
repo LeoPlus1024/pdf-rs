@@ -10,4 +10,4 @@ pub(crate) mod tokenizer;
 pub(crate) mod catalog;
 pub(crate) mod encoding;
 mod pstr;
-mod date;
+pub mod date;

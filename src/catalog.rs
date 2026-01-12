@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use crate::constants::{COUNT, FIRST, KIDS, LAST, NEXT, OUTLINES, PAGES, PREV, TITLE, TYPE};
 use crate::error::PDFError::{ObjectAttrMiss, PDFParseError, XrefEntryNotFound};
 use crate::error::Result;
@@ -6,6 +7,7 @@ use crate::parser::parse_with_offset;
 use crate::tokenizer::Tokenizer;
 use crate::utils::xrefs_search;
 use std::collections::HashMap;
+use std::fmt::{format, Display, Formatter};
 use crate::encoding::PreDefinedEncoding;
 use crate::pstr::convert_glyph_text;
 
@@ -13,6 +15,14 @@ macro_rules! mixture_node_id {
     ($obj_num:expr,$gen_num:expr) => {{
         let node_id = ($obj_num as u64) << 16 | $gen_num as u64;
         node_id
+    }};
+}
+
+macro_rules! separate_node_id {
+    ($node_id:expr) => {{
+        let obj_num = ($node_id >> 16) as u64;
+        let gen_num = ($node_id & 0xFFFF) as u64;
+        (obj_num, gen_num)
     }};
 }
 
@@ -24,7 +34,7 @@ type NodeId = u64;
 /// The `PageTreeArean` manages a hierarchical structure of page nodes,
 /// where each node can be either a page tree node (intermediate node) or
 /// a page leaf node (terminal node containing actual page content).
-pub(crate) struct PageTreeArean {
+pub struct PageTreeArean {
     /// The ID of the root node in the page tree.
     root_id: NodeId,
     /// A collection of all nodes in the page tree, indexed by their IDs.
@@ -55,7 +65,7 @@ pub(crate) struct PageNode {
 ///
 /// The outline provides a hierarchical navigation structure for the document,
 /// typically displayed in the PDF viewer's sidebar.
-pub(crate) struct OutlineTreeArean {
+pub struct OutlineTreeArean {
     /// The ID of the root node in the outline tree.
     root_id: NodeId,
     /// A collection of all nodes in the outline tree, indexed by their IDs.
@@ -308,6 +318,68 @@ impl PageTreeArean {
     /// The total number of pages in the document
     pub(crate) fn get_page_num(&self) -> usize {
         self.nodes.values().filter(|node| node.count == 0).count()
+    }
+}
+
+/// Formats a page node for display with tree-like indentation.
+///
+/// This function recursively formats the page tree structure for display purposes,
+/// showing the hierarchical relationship between nodes using ASCII characters.
+/// Each node is displayed with its object number, generation number, count of children,
+/// and any child nodes are indented to show the tree structure.
+///
+/// # Arguments
+///
+/// * `page_tree_arean` - A reference to the page tree arena containing all nodes
+/// * `node_id` - The ID of the current node being formatted
+/// * `f` - A mutable reference to the formatter for writing output
+/// * `indent` - The current indentation level for tree display
+/// * `is_last` - Boolean indicating if this is the last child at the current level
+///
+/// # Returns
+///
+/// A `std::fmt::Result` indicating whether the formatting was successful
+fn fmt_page_node(
+    page_tree_arean: &PageTreeArean,
+    node_id: &NodeId,
+    f: &mut Formatter<'_>,
+    indent: usize,
+    is_last: bool,
+) -> std::fmt::Result {
+    if let Some(page_node) = page_tree_arean.nodes.get(node_id) {
+        let (obj_num, gen_num) = separate_node_id!(node_id);
+
+        let prefix = if indent == 0 {
+            String::new()
+        } else {
+            format!("{}{}", "│   ".repeat(indent - 1), if is_last { "└── " } else { "├── " })
+        };
+        writeln!(f, "{}Page：[{},{}]", prefix, obj_num, gen_num)?;
+        writeln!(f, "{}├── Count：{}",
+                 "│   ".repeat(indent),
+                 page_node.kids.as_ref().map_or(0, |k| k.len())
+        )?;
+
+        writeln!(f, "{}└── Kids", "│   ".repeat(indent))?;
+
+        if let Some(kids) = page_node.kids.as_ref() {
+            let total = kids.len();
+            for (i, kid_id) in kids.iter().enumerate() {
+                let is_kid_last = (i == total - 1);
+                fmt_page_node(page_tree_arean, kid_id, f, indent + 1, is_kid_last)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+impl Display for PageTreeArean {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let root_id = &self.root_id;
+        if let Some(page_node) = self.nodes.get(&root_id) {
+            fmt_page_node(self, root_id, f, 0,false)?;
+        }
+        write!(f, "" )
     }
 }
 

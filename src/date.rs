@@ -118,6 +118,30 @@ impl Date {
     fn is_leap_year(year: i32) -> bool {
         (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
     }
+
+    /// Returns the millisecond component of the date and time.
+    ///
+    /// This represents the number of milliseconds elapsed since the Unix epoch
+    /// (January 1, 1970, 00:00:00 UTC), adjusted for the time zone offset.
+    ///
+    /// # Returns
+    ///
+    /// The millisecond value as a `u64`.
+    pub fn get_millisecond(&self) -> u64 {
+        self.millisecond
+    }
+
+    /// Returns the time zone offset from UTC in hours.
+    ///
+    /// This represents the time zone offset that was used when creating this
+    /// `Date` instance. The value is in the range of -12 to +12 hours.
+    ///
+    /// # Returns
+    ///
+    /// The time zone offset in hours as an `i8`.
+    pub fn get_time_zero(&self) -> i8 {
+        self.time_zero
+    }
 }
 
 fn parse_part(text: &str, range: Range<usize>) -> u8 {

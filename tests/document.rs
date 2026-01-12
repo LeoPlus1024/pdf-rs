@@ -16,13 +16,13 @@ fn document() -> Result<()> {
 
 
 #[test]
-fn test_stream_read()->Result<()>{
+fn test_stream_read() -> Result<()> {
     let mut document = PDFDocument::open(PathBuf::from("document/pdfreference1.0.pdf"))?;
-    match document.find_xref_index(|entry|entry.get_obj_num() == 1354){
+    match document.find_xref_index(|entry| entry.get_obj_num() == 1354) {
         Some(index) => {
             let object = document.read_object(index)?.unwrap();
             match object.as_indirect_object() {
-                Some((obj_num,gen_num,obj)) => {
+                Some((obj_num, gen_num, obj)) => {
                     assert!(obj.is_stream());
                     assert!(obj_num == 1354 && gen_num == 0)
                 }
@@ -31,5 +31,13 @@ fn test_stream_read()->Result<()>{
         }
         _ => assert!(false),
     }
+    Ok(())
+}
+
+#[test]
+fn test_page_tree() -> Result<()> {
+    let mut document = PDFDocument::open(PathBuf::from("document/pdfreference1.0.pdf"))?;
+    let page_tree = document.get_page_tree();
+    println!("{}", page_tree.to_string());
     Ok(())
 }
