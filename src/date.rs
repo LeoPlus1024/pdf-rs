@@ -172,7 +172,7 @@ impl FromStr for Date {
             } else {
                 let plus_sign = tmp == "+";
                 let minus_sign = tmp == "-";
-                if !plus_sign || minus_sign || length < 19 {
+                if !plus_sign || !minus_sign || length < 19 {
                     return Err(PDFError::IllegalDateFormat(text.to_string()));
                 }
                 let tz = parse_part(text, 17..19) as i8;
