@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use pdf_rs::document::PDFDocument;
 use pdf_rs::error::Result;
+use pdf_rs::helper::extract_page_text;
+
 #[test]
 fn document() -> Result<()> {
     let mut document = PDFDocument::open(PathBuf::from("document/pdfreference1.0.pdf"))?;
@@ -37,7 +39,10 @@ fn test_stream_read() -> Result<()> {
 #[test]
 fn test_page_tree() -> Result<()> {
     let mut document = PDFDocument::open(PathBuf::from("document/pdfreference1.0.pdf"))?;
-    let page_tree = document.get_page_tree();
-    println!("{}", page_tree.to_string());
+    let page_ids = document.get_page_ids();
+    assert_eq!(page_ids.len(), document.get_page_num());
+    for page_id in page_ids {
+        extract_page_text(&mut document, page_id)?;
+    }
     Ok(())
 }

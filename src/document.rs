@@ -1,12 +1,16 @@
-use crate::catalog::{OutlineTreeArean, PageTreeArean, decode_catalog_data};
+use crate::catalog::{NodeId, OutlineTreeArean, PageTreeArean, decode_catalog_data, PageNode};
 use crate::constants::pdf_key::{START_XREF, XREF};
-use crate::constants::{AUTHOR, CREATION_DATE, CREATOR, INFO, MOD_DATE, PREV, PRODUCER, ROOT, TITLE};
+use crate::constants::{
+    AUTHOR, CREATION_DATE, CREATOR, INFO, MOD_DATE, PREV, PRODUCER, ROOT, TITLE,
+};
+use crate::convert_glyph_from_dict;
+use crate::date::Date;
 use crate::encoding::PreDefinedEncoding;
 use crate::error::PDFError::{
     InvalidPDFDocument, ObjectAttrMiss, PDFParseError, XrefTableNotFound,
 };
 use crate::error::Result;
-use crate::objects::{Dictionary, PDFNumber, PDFObject, XEntry};
+use crate::objects::{Dictionary, ObjRefTuple, PDFNumber, PDFObject, XEntry};
 use crate::parser::{parse, parse_text_xref, parse_with_offset};
 use crate::pstr::convert_glyph_text;
 use crate::sequence::{FileSequence, Sequence};
@@ -15,8 +19,6 @@ use crate::utils::{count_leading_line_endings, line_ending, literal_to_u64, xref
 use crate::vpdf::PDFVersion;
 use std::path::PathBuf;
 use std::str::FromStr;
-use crate::convert_glyph_from_dict;
-use crate::date::Date;
 
 pub struct PDFDescribe {
     /// (Optional) The name of the application that converted the document from its native format to
@@ -180,22 +182,24 @@ impl PDFDocument {
         Ok(Some(object))
     }
 
-    /// Gets the total number of pages in the PDF document.
-    ///
-    /// # Returns
-    ///
-    /// The number of pages in the document
+    pub fn read_object_with_ref(&mut self, tuple: ObjRefTuple) -> Result<Option<PDFObject>> {
+        self.xrefs
+            .iter()
+            .position(|entry| entry.obj_num == tuple.0 && entry.gen_num == tuple.1)
+            .map(|index| self.read_object(index))
+            .unwrap_or(Ok(None))
+    }
+
     pub fn get_page_num(&self) -> usize {
         self.page_tree_arena.get_page_num()
     }
 
-    /// Gets the page tree arena
-    ///
-    /// # Returns
-    ///
-    /// The page tree arena
-    pub fn get_page_tree(&self)->&PageTreeArean{
-        &self.page_tree_arena
+    pub fn get_page_ids(&self) -> Vec<NodeId> {
+        self.page_tree_arena.get_leaf_page_ids()
+    }
+
+    pub fn get_page(&self, node_id: NodeId) -> Option<&PageNode> {
+        self.page_tree_arena.get_page_node(node_id)
     }
 }
 
@@ -218,8 +222,7 @@ fn parse_version(sequence: &mut impl Sequence) -> Result<PDFVersion> {
     if n < 8 {
         return Err(InvalidPDFDocument);
     }
-    if buf.len() < 8 || !buf.starts_with(b"%PDF-")
-    {
+    if buf.len() < 8 || !buf.starts_with(b"%PDF-") {
         return Err(InvalidPDFDocument);
     }
     let version = String::from_utf8(buf[5..8].to_vec())?;
@@ -262,7 +265,7 @@ fn merge_xref_table(
                 }
             }
         }
-        if let PDFObject::Dict(mut dictionary) = parse(&mut tokenizer)? {
+        if let PDFObject::Dict(dictionary) = parse(&mut tokenizer)? {
             if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = dictionary.get(ROOT) {
                 catalog = Some((*obj_num, *gen_num));
                 if let Some(PDFObject::ObjectRef(obj_num, gen_num)) = dictionary.get(INFO) {
@@ -338,15 +341,19 @@ impl PDFDescribe {
         let encoding = PreDefinedEncoding::PDFDoc;
         let producer = convert_glyph_from_dict!(dictionary, PRODUCER, &encoding);
         let creator = convert_glyph_from_dict!(dictionary, CREATOR, &encoding);
-        let creation_date = convert_glyph_from_dict!(dictionary, CREATION_DATE, &encoding)
-            .map_or(None, |text| match Date::from_str(text.as_str()) {
-                Ok(date) => Some(date),
-                Err(_) => None,
+        let creation_date =
+            convert_glyph_from_dict!(dictionary, CREATION_DATE, &encoding).map_or(None, |text| {
+                match Date::from_str(text.as_str()) {
+                    Ok(date) => Some(date),
+                    Err(_) => None,
+                }
             });
-        let mod_date = convert_glyph_from_dict!(dictionary, MOD_DATE, &encoding)
-            .map_or(None, |text| match Date::from_str(text.as_str()) {
-                Ok(date) => Some(date),
-                Err(_) => None,
+        let mod_date =
+            convert_glyph_from_dict!(dictionary, MOD_DATE, &encoding).map_or(None, |text| {
+                match Date::from_str(text.as_str()) {
+                    Ok(date) => Some(date),
+                    Err(_) => None,
+                }
             });
         let author = convert_glyph_from_dict!(dictionary, AUTHOR, &encoding);
         let title = convert_glyph_from_dict!(dictionary, TITLE, &encoding);
@@ -356,7 +363,7 @@ impl PDFDescribe {
             creation_date,
             author,
             title,
-            mod_date
+            mod_date,
         }
     }
 }

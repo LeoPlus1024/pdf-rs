@@ -1,15 +1,14 @@
-use std::fmt::Write;
 use crate::constants::{COUNT, FIRST, KIDS, LAST, NEXT, OUTLINES, PAGES, PREV, TITLE, TYPE};
+use crate::encoding::PreDefinedEncoding;
 use crate::error::PDFError::{ObjectAttrMiss, PDFParseError, XrefEntryNotFound};
 use crate::error::Result;
-use crate::objects::{Dictionary, PDFNumber, PDFObject, XEntry};
+use crate::objects::{Dictionary, ObjRefTuple, PDFNumber, PDFObject, XEntry};
 use crate::parser::parse_with_offset;
+use crate::pstr::convert_glyph_text;
 use crate::tokenizer::Tokenizer;
 use crate::utils::xrefs_search;
 use std::collections::HashMap;
-use std::fmt::{format, Display, Formatter};
-use crate::encoding::PreDefinedEncoding;
-use crate::pstr::convert_glyph_text;
+use std::fmt::{Display, Formatter};
 
 macro_rules! mixture_node_id {
     ($obj_num:expr,$gen_num:expr) => {{
@@ -17,17 +16,16 @@ macro_rules! mixture_node_id {
         node_id
     }};
 }
-
-macro_rules! separate_node_id {
+macro_rules! extract_node_id {
     ($node_id:expr) => {{
-        let obj_num = ($node_id >> 16) as u64;
-        let gen_num = ($node_id & 0xFFFF) as u64;
+        let obj_num = ($node_id >> 16) as u32;
+        let gen_num = ($node_id & 0xFFFF) as u16;
         (obj_num, gen_num)
     }};
 }
 
 /// Type alias for node identifiers in the page tree.
-type NodeId = u64;
+pub type NodeId = u64;
 
 /// Represents a tree structure for organizing pages in a PDF document.
 ///
@@ -46,13 +44,15 @@ pub struct PageTreeArean {
 /// Each node can be either:
 /// - A page tree node (intermediate node with children)
 /// - A page leaf node (terminal node representing an actual page)
-pub(crate) struct PageNode {
+pub struct PageNode {
+    /// The ID of the page node.
+    node_id: NodeId,
     /// The attributes of the page node stored as a dictionary.
     attrs: Dictionary,
     /// The count of pages or child nodes under this node.
     /// For leaf nodes, this is 0. For intermediate nodes, this is the total
     /// number of leaf nodes under this node.
-    count: usize,
+    count: u64,
     /// Optional list of child node IDs for intermediate nodes.
     /// This is None for leaf nodes (actual pages).
     kids: Option<Vec<NodeId>>,
@@ -65,7 +65,7 @@ pub(crate) struct PageNode {
 ///
 /// The outline provides a hierarchical navigation structure for the document,
 /// typically displayed in the PDF viewer's sidebar.
-pub struct OutlineTreeArean {
+pub(crate) struct OutlineTreeArean {
     /// The ID of the root node in the outline tree.
     root_id: NodeId,
     /// A collection of all nodes in the outline tree, indexed by their IDs.
@@ -75,7 +75,7 @@ pub struct OutlineTreeArean {
 /// Represents a node in the outline (bookmark) tree.
 ///
 /// Each outline node corresponds to a bookmark entry in the PDF document.
-pub(crate) struct OutlineNode {
+pub struct OutlineNode {
     count: i64,
     /// The title of the bookmark.
     title: Option<String>,
@@ -172,30 +172,31 @@ fn build_page_tree(
         PDFObject::IndirectObject(_, _, value) => *value,
         _ => return Err(XrefEntryNotFound(obj_ref.0, obj_ref.1)),
     };
-    let dict = match obj {
+    let attrs = match obj {
         PDFObject::Dict(dict) => dict,
         _ => return Err(PDFParseError("Page attributes is not a dict")),
     };
-    let is_page_tree = dict.named_value_was(TYPE, PAGES);
+    let is_page_tree = attrs.named_value_was(TYPE, PAGES);
     // If it is not a page tree, then it is a page
     if !is_page_tree {
-        let leaf_node = PageNode {
-            attrs: dict,
-            kids: None,
-            count: 0,
-            parent_id,
-        };
         let node_id = mixture_node_id!(obj_ref.0, obj_ref.1);
+        let leaf_node = PageNode::new(
+            node_id,
+            attrs,
+            None,
+            0,
+            parent_id,
+        );
         nodes.insert(node_id, leaf_node);
         return Ok(());
     }
-    let count = match dict.get_u64_num(COUNT) {
-        Some(count) => count as usize,
+    let count = match attrs.get_u64_num(COUNT) {
+        Some(count) => count,
         _ => return Err(PDFParseError("Page count not exist or not a number")),
     };
     let mut kids = None;
     if count > 0 {
-        let arr = match dict.get_array_value(KIDS) {
+        let arr = match attrs.get_array_value(KIDS) {
             Some(kids) => kids,
             _ => return Err(PDFParseError("Page kids not exist or not an array")),
         };
@@ -213,13 +214,15 @@ fn build_page_tree(
         }
         kids = Some(children)
     };
-    let page_node = PageNode {
-        attrs: dict,
+    let node_id = mixture_node_id!(obj_ref.0, obj_ref.1);
+    let page_node = PageNode::new(
+        node_id,
+        attrs,
         kids,
         count,
         parent_id,
-    };
-    nodes.insert(mixture_node_id!(obj_ref.0, obj_ref.1), page_node);
+    );
+    nodes.insert(node_id, page_node);
     Ok(())
 }
 
@@ -319,6 +322,29 @@ impl PageTreeArean {
     pub(crate) fn get_page_num(&self) -> usize {
         self.nodes.values().filter(|node| node.count == 0).count()
     }
+
+    pub(crate) fn get_leaf_page_ids(&self) -> Vec<NodeId> {
+        let root_id = self.root_id;
+        let mut page_node_ids = Vec::new();
+        self.fetch_kid_page(&mut page_node_ids, root_id);
+        page_node_ids
+    }
+
+    pub(crate) fn get_page_node(&self, node_id: NodeId) -> Option<&PageNode> {
+        self.nodes.get(&node_id)
+    }
+
+    fn fetch_kid_page(&self, page_node_ids: &mut Vec<NodeId>, node_id: NodeId) {
+        if let Some(page_node) = self.nodes.get(&node_id) {
+            if page_node.count == 0 {
+                page_node_ids.push(node_id);
+            } else if let Some(kids) = page_node.kids.as_ref() {
+                for kid_id in kids {
+                    self.fetch_kid_page(page_node_ids, *kid_id);
+                }
+            }
+        }
+    }
 }
 
 /// Formats a page node for display with tree-like indentation.
@@ -347,7 +373,7 @@ fn fmt_page_node(
     is_last: bool,
 ) -> std::fmt::Result {
     if let Some(page_node) = page_tree_arean.nodes.get(node_id) {
-        let (obj_num, gen_num) = separate_node_id!(node_id);
+        let (obj_num, gen_num) = extract_node_id!(node_id);
 
         let prefix = if indent == 0 {
             String::new()
@@ -379,12 +405,52 @@ impl Display for PageTreeArean {
         if let Some(page_node) = self.nodes.get(&root_id) {
             fmt_page_node(self, root_id, f, 0,false)?;
         }
-        write!(f, "" )
+        Ok(())
     }
 }
+
+
 
 impl OutlineTreeArean {
     pub(crate) fn new(root_id: NodeId, nodes: HashMap<NodeId, OutlineNode>) -> Self {
         Self { root_id, nodes }
+    }
+}
+
+impl PageNode {
+    pub(crate) fn new(node_id: NodeId, attrs: Dictionary, kids: Option<Vec<NodeId>>, count: u64, parent_id: Option<NodeId>) -> Self {
+        Self { node_id, attrs, kids, count, parent_id }
+    }
+    
+    pub fn get_page_obj_ref(&self) -> ObjRefTuple {
+        extract_node_id!(self.node_id)
+    }
+    
+    pub fn get_parent_obj_ref(&self) -> Option<ObjRefTuple> {
+        self.parent_id.map(|id| extract_node_id!(id))
+    }
+
+    pub fn get_page_id(&self) -> NodeId {
+        self.node_id
+    }
+
+    pub fn get_parent_id(&self) -> Option<NodeId> {
+        self.parent_id
+    }
+    
+    pub fn get_attrs(&self) -> &Dictionary {
+        &self.attrs
+    }
+    
+    pub fn get_attr(&self, key: &str) -> Option<&PDFObject> {
+        self.attrs.get(key)
+    }
+    
+    pub fn get_kids(&self) -> &Option<Vec<NodeId>> {
+        &self.kids
+    }
+    
+    pub fn get_count(&self) -> u64 {
+        self.count
     }
 }

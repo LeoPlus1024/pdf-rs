@@ -11,3 +11,4 @@ pub(crate) mod catalog;
 pub(crate) mod encoding;
 mod pstr;
 pub mod date;
+pub mod helper;

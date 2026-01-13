@@ -37,4 +37,6 @@ pub enum PDFError {
     PDFObjectCastError(&'static str),
     #[error("Illegal date format:{0}")]
     IllegalDateFormat(String),
+    #[error("Page not found:{0}")]
+    PageNotFound(String),
 }

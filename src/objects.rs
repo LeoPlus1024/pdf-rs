@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+pub type ObjRefTuple = (u32, u16);
+
 #[derive(PartialEq, Clone)]
 pub enum PDFNumber {
     Signed(i64),
@@ -24,6 +26,7 @@ pub struct Dictionary {
 }
 
 pub struct Stream {
+    buf: Vec<u8>,
     metadata: Dictionary,
 }
 
@@ -405,7 +408,7 @@ impl XEntry {
 impl Stream {
     /// Creates a new stream with the given metadata.
     pub(crate) fn new(metadata: Dictionary,buf:Vec<u8>) -> Self {
-        Stream { metadata }
+        Stream { buf, metadata }
     }
 }
 
