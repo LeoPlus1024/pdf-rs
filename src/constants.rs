@@ -84,3 +84,4 @@ pub(crate) const AUTHOR: &str = "Author";
 pub(crate) const TITLE: &str = "Title";
 pub(crate) const MOD_DATE:&str = "ModDate";
 pub(crate) const CONTENTS:&str = "Contents";
+pub(crate) const FILTER:&str = "Filter";

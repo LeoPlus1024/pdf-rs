@@ -1,4 +1,4 @@
-use crate::constants::{COUNT, FIRST, KIDS, LAST, NEXT, OUTLINES, PAGES, PREV, TITLE, TYPE};
+use crate::constants::{CONTENTS, COUNT, FIRST, KIDS, LAST, NEXT, OUTLINES, PAGES, PREV, TITLE, TYPE};
 use crate::encoding::PreDefinedEncoding;
 use crate::error::PDFError::{ObjectAttrMiss, PDFParseError, XrefEntryNotFound};
 use crate::error::Result;
@@ -452,5 +452,19 @@ impl PageNode {
     
     pub fn get_count(&self) -> u64 {
         self.count
+    }
+
+    pub(crate) fn get_contents(&self)->Vec<ObjRefTuple> {
+        match self.attrs.get(CONTENTS) {
+            Some(PDFObject::ObjectRef(obj_num, gen_num)) => vec![(*obj_num, *gen_num)],
+            Some(PDFObject::Array(arr)) => arr.iter().filter_map(|obj| {
+                if let PDFObject::ObjectRef(obj_num, gen_num) = obj {
+                    Some((*obj_num, *gen_num))
+                } else {
+                    None
+                }
+            }).collect(),
+            _ => vec![]
+        }
     }
 }

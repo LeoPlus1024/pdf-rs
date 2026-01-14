@@ -26,6 +26,7 @@ name = "document"
 path = "tests/document.rs"
 
 [dependencies]
+flate2 = "1.0"
 thiserror = "2.0.17"
 
 [package.metadata.docs.rs]

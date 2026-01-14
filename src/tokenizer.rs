@@ -342,10 +342,10 @@ impl Tokenizer {
             self.buf.clear();
             buf
         };
-        #[cfg(debug_assertions)]
-        {
-            hexdump(&buf);
-        }
+        // #[cfg(debug_assertions)]
+        // {
+        //     hexdump(&buf);
+        // }
         // Clear token buffer
         self.token_buf.clear();
         Ok(buf)

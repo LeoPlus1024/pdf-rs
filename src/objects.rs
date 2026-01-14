@@ -1,14 +1,25 @@
 use std::collections::HashMap;
+use crate::constants::FILTER;
 
+/// Type alias for an object reference tuple containing object number and generation number.
 pub type ObjRefTuple = (u32, u16);
 
+/// Represents a numeric value in a PDF document.
+///
+/// PDF supports three types of numbers: signed integers, unsigned integers, and real numbers.
 #[derive(PartialEq, Clone)]
 pub enum PDFNumber {
+    /// A signed integer value.
     Signed(i64),
+    /// An unsigned integer value.
     Unsigned(u64),
+    /// A real (floating-point) value.
     Real(f64),
 }
 
+/// Represents a cross-reference table entry.
+///
+/// XRef entries map object numbers to their file positions and track whether objects are in use.
 #[derive(Clone)]
 pub struct XEntry {
     /// The value of the entry.
@@ -21,21 +32,34 @@ pub struct XEntry {
     pub(crate) gen_num: u16,
 }
 
+/// Represents a PDF dictionary object.
+///
+/// Dictionaries are associative tables containing key-value pairs where keys are names
+/// and values can be any PDF object type.
 pub struct Dictionary {
     entries: HashMap<String, PDFObject>,
 }
 
+/// Represents a PDF stream object.
+///
+/// Streams contain large amounts of data (like images or page content) with associated metadata.
 pub struct Stream {
     buf: Vec<u8>,
     metadata: Dictionary,
 }
 
+/// Represents the kind of PDF string encoding.
 #[derive(PartialEq)]
 pub(crate) enum PDFStrKind {
+    /// Literal string enclosed in parentheses.
     Literal,
+    /// Hexadecimal string enclosed in angle brackets.
     Hexadecimal,
 }
 
+/// Represents a PDF string object.
+///
+/// Strings can be either literal or hexadecimal encoded.
 pub struct PDFString {
     kind: PDFStrKind,
     buf: Vec<u8>,
@@ -406,26 +430,87 @@ impl XEntry {
 }
 
 impl Stream {
-    /// Creates a new stream with the given metadata.
+    /// Creates a new stream with the given metadata and buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - A dictionary containing stream metadata
+    /// * `buf` - The byte buffer containing the stream data
+    ///
+    /// # Returns
+    ///
+    /// A new `Stream` instance
     pub(crate) fn new(metadata: Dictionary,buf:Vec<u8>) -> Self {
         Stream { buf, metadata }
     }
+
+    /// Returns a slice reference to the stream's byte buffer.
+    ///
+    /// # Returns
+    ///
+    /// A slice reference to the internal byte buffer
+    pub(crate) fn as_slice(&self) -> &[u8] {
+        &self.buf
+    }
+
+
+    pub(crate) fn get_filters(&self) -> Vec<String> {
+        match self.metadata.get(FILTER){
+            Some(PDFObject::Array(arr)) => {
+                arr.iter()
+                    .filter_map(|it| it.as_name())
+                    .map(|it| it.clone())
+                    .collect()
+            }
+            Some(PDFObject::Named(name)) => {
+                vec![name.clone()]
+            }
+            _ => vec![]
+        }
+    } 
 }
 
 impl PDFString {
+    /// Creates a new PDF string with the specified kind and buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The encoding kind of the string (Literal or Hexadecimal)
+    /// * `buf` - The byte buffer containing the string data
+    ///
+    /// # Returns
+    ///
+    /// A new `PDFString` instance
     pub(crate) fn new(kind: PDFStrKind, buf: Vec<u8>) -> Self {
         PDFString { kind, buf }
     }
 
+    /// Returns a reference to the string's byte buffer.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the internal byte buffer
     pub(crate) fn get_buf(&self) -> &Vec<u8> {
         &self.buf
     }
 
+    /// Returns the encoding kind of the string.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `PDFStrKind` indicating the encoding type
     pub(crate) fn get_kind(&self) -> &PDFStrKind {
         &self.kind
     }
 
     /// Returns true if the string is in UTF-16BE encoding.
+    ///
+    /// This checks if the string is hexadecimal encoded and starts with the
+    /// UTF-16BE byte order mark (BOM) 0xFE 0xFF.
+    ///
+    /// # Returns
+    ///
+    /// True if the string is UTF-16BE encoded, false otherwise
     pub(crate) fn is_utf16be(&self) -> bool {
         if self.kind == PDFStrKind::Literal {
             return false;

@@ -39,4 +39,8 @@ pub enum PDFError {
     IllegalDateFormat(String),
     #[error("Page not found:{0}")]
     PageNotFound(String),
+    #[error("Content stream type error")]
+    ContentStreamTypeError,
+    #[error("Not support filter:{0}")]
+    NotSupportFilter(String),
 }
