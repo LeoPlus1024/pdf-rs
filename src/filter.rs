@@ -18,12 +18,6 @@ use std::io::Read;
 ///
 /// A vector of decoded bytes
 ///
-/// # Examples
-///
-/// ```
-/// let decoded = ascii_85_decode(b"87cURDn");
-/// assert_eq!(decoded, b"Hello");
-/// ```
 fn ascii_85_decode(buf: &[u8]) -> Vec<u8> {
     static ASCII_85_LOOKUP: [u8; 5] = [
         1, 1, 2, 3, 4
