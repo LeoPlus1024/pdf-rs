@@ -18,14 +18,14 @@ use std::io::Read;
 ///
 /// A vector of decoded bytes
 ///
-fn ascii_85_decode(buf: &[u8]) -> Vec<u8> {
+fn ascii_85_decode(buf: &[u8]) -> Result<Vec<u8>> {
     static ASCII_85_LOOKUP: [u8; 5] = [
         1, 1, 2, 3, 4
     ];
     let mut bytes = Vec::new();
-    let l = buf.len();
     let mut t = [0u8; 5];
     let mut w = 0;
+    let l = buf.len();
     for i in 0..l {
         let b = buf[i];
         if b == b'z' {
@@ -35,20 +35,34 @@ fn ascii_85_decode(buf: &[u8]) -> Vec<u8> {
         if b == b'\n' || b == b'\r' || b == b'\t' || b == b' ' {
             continue;
         }
-        t[4 - w] = b - 33;
-        w += 1;
-        if w == 5 || i == l - 1 {
+        let mut e = false;
+        if b < b'!' || b > b'u' {
+            e = (b == b'~' && i < l - 1 && buf[i + 1] == b'>');
+            if !e {
+                return Err(PDFError::InvalidStreamByteSequence(format!("ASCII85Decode must be between '!' and 'u' but it is '{}'", b as char)));
+            } else if w == 0 {
+                break;
+            }
+        }
+        if !e {
+            t[4 - w] = b - 33;
+            w += 1;
+        }
+        if w == 5 || i == l - 1 || e {
             let mut value = 0u32;
             for (i, v) in t.iter_mut().enumerate() {
                 value = value + (*v as u32) * 85u32.pow((i) as u32);
             }
             let k = value.to_be_bytes();
             bytes.extend_from_slice(&k[0..ASCII_85_LOOKUP[w - 1] as usize]);
+            if e {
+                break;
+            }
             w = 0;
             t.fill(0);
         }
     }
-    bytes
+    Ok(bytes)
 }
 
 /// Decodes stream data using the specified filter.
@@ -77,7 +91,7 @@ fn decode_stream_xx_decode(filter: &str, buf: &[u8]) -> Result<Vec<u8>> {
             flate_bytes
         }
         "ASCIIHexDecode" => hex2bytes(buf),
-        "ASCII85Decode" => ascii_85_decode(buf),
+        "ASCII85Decode" => ascii_85_decode(buf)?,
         _ => return Err(PDFError::NotSupportFilter(filter.to_string()))
     };
     Ok(bytes)
@@ -127,12 +141,21 @@ mod tests {
     /// - Whitespace characters are properly ignored
     /// - Standard ASCII85 encoded strings decode correctly
     #[test]
-    fn test_ascii_85_decode() {
-        let bytes = ascii_85_decode(b"z");
+    fn test_ascii_85_decode() -> Result<()> {
+        let bytes = ascii_85_decode(b"z")?;
         assert_eq!(bytes, [0u8; 4]);
-        let bytes = ascii_85_decode(b"z\n");
+        let bytes = ascii_85_decode(b"z\n")?;
         assert_eq!(bytes, [0u8; 4]);
-        let bytes = ascii_85_decode(b"87cURDn");
+        let bytes = ascii_85_decode(b"87cURDn")?;
         assert_eq!(bytes, b"Hello");
+        let bytes = ascii_85_decode(b"z~>")?;
+        assert_eq!(bytes, [0u8; 4]);
+        let bytes = ascii_85_decode(b"z\n~>")?;
+        assert_eq!(bytes, [0u8; 4]);
+        let bytes = ascii_85_decode(b"87cURDn~>")?;
+        assert_eq!(bytes, b"Hello");
+        let result = ascii_85_decode(b"87cURDnv\n~>");
+        assert_eq!(result.is_err(), true);
+        Ok(())
     }
 }

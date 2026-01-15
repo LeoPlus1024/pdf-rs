@@ -43,4 +43,6 @@ pub enum PDFError {
     ContentStreamTypeError,
     #[error("Not support filter:{0}")]
     NotSupportFilter(String),
+    #[error("Invalid stream byte sequence:{0}")]
+    InvalidStreamByteSequence(String),
 }
