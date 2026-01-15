@@ -40,7 +40,8 @@ fn ascii_85_decode(buf: &[u8]) -> Result<Vec<u8>> {
             e = (b == b'~' && i < l - 1 && buf[i + 1] == b'>');
             if !e {
                 return Err(PDFError::InvalidStreamByteSequence(format!("ASCII85Decode must be between '!' and 'u' but it is '{}'", b as char)));
-            } else if w == 0 {
+            }
+            if w == 0 {
                 break;
             }
         }
