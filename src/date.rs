@@ -32,7 +32,7 @@ impl Date {
     /// # Returns
     ///
     /// A new Date instance with the calculated Unix timestamp in milliseconds
-    pub fn new(year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8, time_zero: i8, utm: u8) -> Self {
+    fn new(year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8, time_zero: i8, utm: u8) -> Self {
         let millisecond = Self::calculate_unix_timestamp_millis(year, month, day, hour, minute, second, time_zero, utm);
 
         Date {
